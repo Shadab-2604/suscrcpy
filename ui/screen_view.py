@@ -1,8 +1,8 @@
 """Embedded Live Android Screen View for SUSCRCPY.
 
 Hosts the embedded native scrcpy display window inside the left panel of the interface,
-handling responsive ViewportCanvas letterboxing/pillarboxing, aspect ratio synchronization,
-Sync HUD diagnostics, interaction forwarding, and graceful fallbacks.
+handling responsive ViewportCanvas letterboxing/pillarboxing with mathematical contain/fill/original
+aspect ratio fitting, Sync HUD diagnostics, interaction forwarding, and graceful fallbacks.
 """
 from __future__ import annotations
 
@@ -34,9 +34,15 @@ class ViewportCanvas(QtWidgets.QWidget):
         )
 
         self._embedded_container: Optional[QtWidgets.QWidget] = None
-        self._target_w = 1080
-        self._target_h = 1920
-        self._mode = "fit"  # "fit" or "original"
+        self._target_w = 800
+        self._target_h = 1280
+        self._mode = "fit"  # "fit", "fill", or "original"
+
+        # Debounced resize timer for butter-smooth splitter and window resizing
+        self._resize_timer = QtCore.QTimer(self)
+        self._resize_timer.setSingleShot(True)
+        self._resize_timer.setInterval(10)
+        self._resize_timer.timeout.connect(self._do_recalculate_geometry)
 
         # Centered placeholder frame when no scrcpy container is attached
         self.placeholder_layout = QtWidgets.QVBoxLayout(self)
@@ -80,6 +86,19 @@ class ViewportCanvas(QtWidgets.QWidget):
         self.wayland_banner.setVisible(False)
         pl_layout.addWidget(self.wayland_banner)
 
+        # Temporary Updating Display Overlay Badge
+        self.updating_badge = QtWidgets.QFrame(self)
+        self.updating_badge.setStyleSheet(
+            "QFrame { background-color: rgba(18, 22, 31, 0.92); border: 1px solid #3B82F6; border-radius: 6px; padding: 8px 16px; }"
+        )
+        ub_layout = QtWidgets.QHBoxLayout(self.updating_badge)
+        ub_layout.setContentsMargins(10, 6, 10, 6)
+        ub_layout.setSpacing(8)
+        self.ub_label = QtWidgets.QLabel("⟳ Updating display... Synchronizing stream")
+        self.ub_label.setStyleSheet("color: #60A5FA; font-weight: 600; font-size: 12px;")
+        ub_layout.addWidget(self.ub_label)
+        self.updating_badge.setVisible(False)
+
         self.placeholder_layout.addWidget(self.placeholder)
 
     def attach_container(self, container: QtWidgets.QWidget) -> None:
@@ -88,7 +107,7 @@ class ViewportCanvas(QtWidgets.QWidget):
         self._embedded_container = container
         container.setParent(self)
         container.setVisible(True)
-        self.recalculate_geometry()
+        self._do_recalculate_geometry()
         container.show()
         container.setFocus()
 
@@ -108,9 +127,25 @@ class ViewportCanvas(QtWidgets.QWidget):
             self.recalculate_geometry()
 
     def set_display_mode(self, mode: str) -> None:
-        """Set scaling mode ('fit' or 'original')."""
-        self._mode = mode
+        """Set scaling mode ('fit', 'fill', or 'original')."""
+        self._mode = mode.lower()
         self.recalculate_geometry()
+
+    def show_updating_overlay(self, show: bool = True, text: str = "⟳ Updating display...") -> None:
+        """Display temporary status indicator during resolution changes."""
+        self.ub_label.setText(text)
+        self.updating_badge.setVisible(show)
+        if show:
+            self.updating_badge.raise_()
+            self._position_overlay()
+
+    def _position_overlay(self) -> None:
+        if self.updating_badge.isVisible():
+            bw = self.updating_badge.sizeHint().width()
+            bh = self.updating_badge.sizeHint().height()
+            bx = (self.width() - bw) // 2
+            by = (self.height() - bh) // 2
+            self.updating_badge.setGeometry(bx, by, bw, bh)
 
     def calculate_fitted_geometry(
         self,
@@ -119,36 +154,51 @@ class ViewportCanvas(QtWidgets.QWidget):
         target_w: int,
         target_h: int,
     ) -> QtCore.QRect:
-        """Calculate letterbox/pillarbox centered rectangle preserving exact stream ratio."""
+        """Calculate aspect-ratio-preserving rectangle using strict mathematical scaling.
+
+        Let CW = avail_w, CH = avail_h, SW = target_w, SH = target_h.
+        - FIT mode: scale = min(CW / SW, CH / SH)
+        - FILL mode: scale = max(CW / SW, CH / SH)
+        - ORIGINAL mode: scale = 1.0 (subject to available canvas bounds)
+        """
         if avail_w <= 0 or avail_h <= 0 or target_w <= 0 or target_h <= 0:
             return QtCore.QRect(0, 0, max(1, avail_w), max(1, avail_h))
 
+        cw, ch = float(avail_w), float(avail_h)
+        sw, sh = float(target_w), float(target_h)
+
         if self._mode == "original":
-            # 1:1 pixel mapping (clamped to available canvas)
-            fitted_w = min(target_w, avail_w)
-            fitted_h = min(target_h, avail_h)
-            x = max(0, (avail_w - fitted_w) // 2)
-            y = max(0, (avail_h - fitted_h) // 2)
-            return QtCore.QRect(x, y, fitted_w, fitted_h)
+            # 1:1 pixel mapping: render at actual source dimensions
+            rendered_w = int(round(sw))
+            rendered_h = int(round(sh))
+            x = (avail_w - rendered_w) // 2
+            y = (avail_h - rendered_h) // 2
+            return QtCore.QRect(x, y, rendered_w, rendered_h)
 
-        # "fit" mode: Scale to fit bounds while maintaining strict aspect ratio
-        aspect = target_w / target_h
-        fitted_h = avail_h
-        fitted_w = int(round(fitted_h * aspect))
+        if self._mode == "fill":
+            # FILL mode: scale = max(CW / SW, CH / SH) -> fills entire container, cropping excess
+            scale = max(cw / sw, ch / sh)
+            rendered_w = max(1, int(round(sw * scale)))
+            rendered_h = max(1, int(round(sh * scale)))
+            x = (avail_w - rendered_w) // 2
+            y = (avail_h - rendered_h) // 2
+            return QtCore.QRect(x, y, rendered_w, rendered_h)
 
-        if fitted_w > avail_w:
-            fitted_w = avail_w
-            fitted_h = int(round(fitted_w / aspect))
-
-        fitted_w = max(1, min(fitted_w, avail_w))
-        fitted_h = max(1, min(fitted_h, avail_h))
-
-        x = max(0, (avail_w - fitted_w) // 2)
-        y = max(0, (avail_h - fitted_h) // 2)
-        return QtCore.QRect(x, y, fitted_w, fitted_h)
+        # FIT mode (default): scale = min(CW / SW, CH / SH) -> complete screen visible, letterbox/pillarbox
+        scale = min(cw / sw, ch / sh)
+        rendered_w = max(1, int(round(sw * scale)))
+        rendered_h = max(1, int(round(sh * scale)))
+        x = (avail_w - rendered_w) // 2
+        y = (avail_h - rendered_h) // 2
+        return QtCore.QRect(x, y, rendered_w, rendered_h)
 
     def recalculate_geometry(self) -> None:
-        """Re-evaluate container bounds based on current canvas size and target aspect ratio."""
+        """Schedule lightweight geometry recalculation via debounce timer."""
+        self._resize_timer.start(10)
+
+    def _do_recalculate_geometry(self) -> None:
+        """Execute contain/fill geometry fitting on child window."""
+        self._position_overlay()
         if not self._embedded_container:
             return
 
@@ -170,7 +220,7 @@ class ViewportCanvas(QtWidgets.QWidget):
 
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
         super().resizeEvent(event)
-        self.recalculate_geometry()
+        self._do_recalculate_geometry()
 
 
 class SyncHUD(QtWidgets.QFrame):
@@ -191,7 +241,7 @@ class SyncHUD(QtWidgets.QFrame):
 
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(6, 2, 6, 2)
-        layout.setSpacing(10)
+        layout.setSpacing(8)
 
         # Android Logical Dimension Label
         self.android_lbl = QtWidgets.QLabel("📱 Android: --")
@@ -207,6 +257,11 @@ class SyncHUD(QtWidgets.QFrame):
         self.preview_lbl = QtWidgets.QLabel("🖥 Preview: --")
         self.preview_lbl.setToolTip("Calculated fitted geometry inside SUSCRCPY container")
         layout.addWidget(self.preview_lbl)
+
+        # Active Display Mode Badge
+        self.mode_badge = QtWidgets.QLabel("[FIT]")
+        self.mode_badge.setStyleSheet("color: #38BDF8; font-weight: 600; font-size: 10px;")
+        layout.addWidget(self.mode_badge)
 
         # Live FPS Counter
         self.fps_lbl = QtWidgets.QLabel("")
@@ -262,6 +317,7 @@ class ScreenView(QtWidgets.QWidget):
         self._preview_w = 0
         self._preview_h = 0
         self._preview_ratio = ""
+        self._active_mode_str = "fit"
 
         self._poll_timer = QtCore.QTimer(self)
         self._poll_timer.setInterval(80)
@@ -317,13 +373,13 @@ class ScreenView(QtWidgets.QWidget):
 
         tb_layout.addStretch()
 
-        # Display Fit Mode Dropdown
+        # Display Viewing Mode Dropdown (FIT, FILL, ORIGINAL)
         m_lbl = QtWidgets.QLabel("Mode:")
         m_lbl.setStyleSheet("color: #8DA2BC; font-size: 10px;")
         tb_layout.addWidget(m_lbl)
 
         self.mode_combo = QtWidgets.QComboBox()
-        self.mode_combo.addItems(["Fit to Window", "Original Size (1:1)"])
+        self.mode_combo.addItems(["FIT (Contain)", "FILL (Crop)", "ORIGINAL (1:1)"])
         self.mode_combo.setStyleSheet("font-size: 10px; padding: 2px 4px;")
         self.mode_combo.currentTextChanged.connect(self._on_mode_changed)
         tb_layout.addWidget(self.mode_combo)
@@ -374,11 +430,24 @@ class ScreenView(QtWidgets.QWidget):
             self.canvas.set_target_dimensions(width, height)
         self._update_sync_status()
 
+    def preview_profile_dimensions(self, width: int, height: int, profile_name: str) -> None:
+        """Preview a profile's aspect ratio inside the canvas without changing device resolution."""
+        logger.info("Previewing profile in ViewportCanvas: %s (%dx%d)", profile_name, width, height)
+        self.canvas.set_target_dimensions(width, height)
+        self.hud.sync_badge.setText(f"● Preview: {profile_name}")
+        self.hud.sync_badge.setStyleSheet("font-weight: 600; color: #38BDF8;")
+        self.canvas.show_updating_overlay(False)
+
+    def set_updating_state(self, is_updating: bool, message: str = "⟳ Updating display...") -> None:
+        """Show or hide the updating display overlay badge."""
+        self.canvas.show_updating_overlay(is_updating, message)
+
     def _on_stream_dimensions_changed(self, width: int, height: int) -> None:
         """Update stream texture resolution value in HUD and canvas."""
         logger.info("Live stream dimensions received: %dx%d", width, height)
         self._stream_w = width
         self._stream_h = height
+        self.canvas.show_updating_overlay(False)
         self.hud.stream_lbl.setText(f"📺 Stream: {width}×{height}")
         self.canvas.set_target_dimensions(width, height)
         self._update_sync_status()
@@ -415,10 +484,21 @@ class ScreenView(QtWidgets.QWidget):
             )
 
     def _on_mode_changed(self, text: str) -> None:
-        if "Original" in text:
+        if "FILL" in text:
+            self._active_mode_str = "fill"
+            self.canvas.set_display_mode("fill")
+            self.hud.mode_badge.setText("[FILL — ✂ Crop Active]")
+            self.hud.mode_badge.setStyleSheet("color: #F59E0B; font-weight: 600; font-size: 10px;")
+        elif "ORIGINAL" in text:
+            self._active_mode_str = "original"
             self.canvas.set_display_mode("original")
+            self.hud.mode_badge.setText("[ORIGINAL (1:1)]")
+            self.hud.mode_badge.setStyleSheet("color: #A78BFA; font-weight: 600; font-size: 10px;")
         else:
+            self._active_mode_str = "fit"
             self.canvas.set_display_mode("fit")
+            self.hud.mode_badge.setText("[FIT]")
+            self.hud.mode_badge.setStyleSheet("color: #38BDF8; font-weight: 600; font-size: 10px;")
 
     def _on_quality_changed(self, text: str) -> None:
         if "Performance" in text:
@@ -514,6 +594,7 @@ class ScreenView(QtWidgets.QWidget):
         self._pending_pid = None
         self._stream_w = 0
         self._stream_h = 0
+        self.canvas.show_updating_overlay(False)
         self.hud.stream_lbl.setText("📺 Stream: --")
         self.hud.fps_lbl.setText("")
         self._update_sync_status()

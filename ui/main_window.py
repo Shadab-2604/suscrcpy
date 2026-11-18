@@ -239,6 +239,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Profile Selector Signals
         self.profile_selector.apply_to_device_requested.connect(self._on_profile_applied)
+        self.profile_selector.preview_requested.connect(self._on_profile_preview_requested)
 
         # Session Manager Signals
         self.session_mgr.session_state_changed.connect(self._on_session_state_changed)
@@ -476,6 +477,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._show_warning("No Device Selected", "Connect and select an authorized device first.")
             return
 
+        self.screen_view.set_updating_state(True, f"⟳ Applying {width}x{height} resolution...")
         try:
             verified_w, verified_h = self.screen_mgr.apply_resolution(self._active_serial, width, height)
             self.settings_panel.set_current_dimensions(verified_w, verified_h, is_override=True)
@@ -488,6 +490,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 device_serial=self._active_serial,
             )
         except Exception as e:
+            self.screen_view.set_updating_state(False)
             self._show_error("Apply Resolution Error", str(e))
 
     def _on_reset_resolution(self) -> None:
@@ -495,6 +498,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._show_warning("No Device Selected", "Connect and select an authorized device first.")
             return
 
+        self.screen_view.set_updating_state(True, "⟳ Restoring native display...")
         try:
             phys_res = self.screen_mgr.reset_resolution(self._active_serial)
             self.settings_panel.set_current_dimensions(phys_res[0], phys_res[1], is_override=False)
@@ -507,6 +511,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 device_serial=self._active_serial,
             )
         except Exception as e:
+            self.screen_view.set_updating_state(False)
             self._show_error("Reset Resolution Error", str(e))
 
     def _on_resync_requested(self) -> None:
@@ -514,6 +519,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if not self._active_serial:
             return
         logger.info("Manual re-sync requested for device %s", self._active_serial)
+        self.screen_view.set_updating_state(True, "⟳ Re-synchronizing display stream...")
         try:
             phys_res, override_res = self.adb.get_display_size(self._active_serial)
             active_w, active_h = override_res if override_res else phys_res
@@ -527,6 +533,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 device_serial=self._active_serial,
             )
         except Exception as e:
+            self.screen_view.set_updating_state(False)
             self._show_error("Re-Sync Error", str(e))
 
     def _on_profile_applied(self, profile: ScreenProfile) -> None:
@@ -534,6 +541,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if not self._active_serial:
             self._show_warning("No Device Selected", "Connect and select an authorized device first.")
             return
+
+        self.screen_view.set_updating_state(True, f"⟳ Applying {profile.model_name} ({profile.width}x{profile.height})...")
         try:
             verified_w, verified_h = self.screen_mgr.apply_resolution(self._active_serial, profile.width, profile.height)
             self.settings_panel.set_current_dimensions(verified_w, verified_h, is_override=True)
@@ -550,7 +559,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 f"Successfully applied screen profile '{profile.model_name}' ({profile.width}x{profile.height}) to device."
             )
         except Exception as e:
+            self.screen_view.set_updating_state(False)
             self._show_error("Profile Application Error", str(e))
+
+    def _on_profile_preview_requested(self, profile: ScreenProfile) -> None:
+        """Preview profile aspect ratio inside LEFT ViewportCanvas without changing physical device resolution."""
+        logger.info("Previewing profile viewport: %s (%dx%d)", profile.model_name, profile.width, profile.height)
+        self.screen_view.preview_profile_dimensions(profile.width, profile.height, profile.model_name)
 
     def _on_application_selected(self, app: Optional[AppInfo]) -> None:
         if app:
