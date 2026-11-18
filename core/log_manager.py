@@ -159,7 +159,7 @@ class LogStreamWorker(QThread):
         while self._running:
             line = stdout.readline()
             if not line:
-                if self._proc.poll() is not None:
+                if not self._proc or self._proc.poll() is not None:
                     break
                 time.sleep(0.02)
                 continue

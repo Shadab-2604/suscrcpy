@@ -139,7 +139,8 @@ class AppManager(QObject):
         """Retrieve granted permissions for the package via dumpsys."""
         permissions: List[str] = []
         try:
-            raw = self.adb.run(["shell", "dumpsys", "package", package_name], serial=serial)
+            res = self.adb.run(["shell", "dumpsys", "package", package_name], serial=serial)
+            raw = res.stdout if hasattr(res, "stdout") else str(res)
             in_perms = False
             for line in raw.splitlines():
                 line = line.strip()

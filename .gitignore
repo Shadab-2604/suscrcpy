@@ -46,6 +46,7 @@ cover/
 
 # Testing Sessions & Evidence
 SUSCRCPY-Evidence/
+docs/audit_evidence/
 .github/
 -f
 .env

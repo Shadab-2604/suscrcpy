@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SUSCRCPY Test Report — SUS-20261118-0004</title>
+<style>
+:root {
+  --bg: #0f141c;
+  --card-bg: #18202c;
+  --card-border: #263345;
+  --text: #e2e8f0;
+  --text-muted: #8da2bc;
+  --primary: #3b82f6;
+  --accent: #06b6d4;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #10b981;
+  --code-bg: #0b0f15;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  padding: 24px;
+}
+.container { max-width: 1200px; margin: 0 auto; }
+header {
+  border-bottom: 2px solid var(--card-border);
+  padding-bottom: 20px;
+  margin-bottom: 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.header-title h1 { font-size: 26px; font-weight: 700; color: #fff; }
+.header-title p { color: var(--text-muted); font-size: 14px; margin-top: 4px; }
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.badge-status { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid #3b82f6; }
+.badge-crit { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+.badge-high { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
+.badge-med { background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid #3b82f6; }
+.badge-low { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+
+.grid-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.metric-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 18px;
+}
+.metric-card .num { font-size: 28px; font-weight: 700; color: #fff; }
+.metric-card .label { color: var(--text-muted); font-size: 13px; text-transform: uppercase; margin-top: 2px; }
+
+.section {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 28px;
+}
+.section h2 {
+  font-size: 18px;
+  color: #fff;
+  border-bottom: 1px solid var(--card-border);
+  padding-bottom: 12px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px 24px;
+}
+.info-row { display: flex; flex-direction: column; font-size: 14px; }
+.info-label { color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
+.info-val { font-weight: 500; color: #fff; margin-top: 2px; word-break: break-all; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin-top: 10px;
+}
+th, td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--card-border);
+}
+th {
+  background: #111722;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 12px;
+}
+tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+.gallery-card {
+  background: #111722;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.gallery-card img {
+  width: 100%;
+  height: auto;
+  max-height: 400px;
+  object-fit: contain;
+  background: #000;
+  display: block;
+}
+.gallery-card .cap {
+  padding: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.code-block {
+  background: var(--code-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  color: #38bdf8;
+  max-height: 320px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+.timeline-list {
+  list-style: none;
+  position: relative;
+  padding-left: 20px;
+}
+.timeline-list:before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: var(--card-border);
+}
+.timeline-item {
+  position: relative;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.timeline-item:before {
+  content: "";
+  position: absolute;
+  left: -18px;
+  top: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.timeline-time { color: var(--text-muted); font-size: 11px; }
+.timeline-desc { font-weight: 500; color: #fff; margin-top: 2px; }
+
+footer {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 24px 0;
+}
+@media print {
+  body { background: #fff; color: #000; }
+  .section, .metric-card { border-color: #ccc; background: #fff; }
+  .header-title h1, .section h2, .metric-card .num, .info-val { color: #000; }
+  th { background: #eee; color: #333; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <div class="header-title">
+    <h1>SUSCRCPY Test Session Report</h1>
+    <p>Session ID: <strong>SUS-20261118-0004</strong> &bull; Generated: 2026-11-18 14:01:12</p>
+  </div>
+  <div>
+    <span class="badge badge-status">Created</span>
+  </div>
+</header>
+
+<div class="grid-metrics">
+  <div class="metric-card">
+    <div class="num">1</div>
+    <div class="label">Observations (0 Crit / 0 High)</div>
+  </div>
+  <div class="metric-card">
+    <div class="num">0</div>
+    <div class="label">Crashes Detected</div>
+  </div>
+  <div class="metric-card">
+    <div class="num">0</div>
+    <div class="label">Errors Recorded</div>
+  </div>
+  <div class="metric-card">
+    <div class="num">0</div>
+    <div class="label">Screenshots Captured</div>
+  </div>
+  <div class="metric-card">
+    <div class="num">0</div>
+    <div class="label">Screen Recordings</div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>📋 Session & Target Diagnostics</h2>
+  <div class="info-grid">
+    <div class="info-row"><span class="info-label">Project</span><span class="info-val">HardwareAudit</span></div>
+    <div class="info-row"><span class="info-label">Session Name</span><span class="info-val">Audit Report Generation</span></div>
+    <div class="info-row"><span class="info-label">Test Type</span><span class="info-val">Functional Testing</span></div>
+    <div class="info-row"><span class="info-label">Tester</span><span class="info-val">Unspecified</span></div>
+    <div class="info-row"><span class="info-label">Start Time</span><span class="info-val">2026-11-18T14:01:12.145362</span></div>
+    <div class="info-row"><span class="info-label">End Time</span><span class="info-val">In Progress</span></div>
+    <div class="info-row"><span class="info-label">Device</span><span class="info-val"> B610A115 (0123456789ABCDEF)</span></div>
+    <div class="info-row"><span class="info-label">Android OS</span><span class="info-val">Android  (SDK )</span></div>
+    <div class="info-row"><span class="info-label">Screen Resolution</span><span class="info-val">0x0 (DPI: N/A)</span></div>
+    <div class="info-row"><span class="info-label">Target App</span><span class="info-val">Full Device</span></div>
+    <div class="info-row"><span class="info-label">Package Name</span><span class="info-val">N/A</span></div>
+    <div class="info-row"><span class="info-label">App Version</span><span class="info-val">N/A (code: N/A)</span></div>
+    <div class="info-row"><span class="info-label">HTTP Proxy</span><span class="info-val">Not configured</span></div>
+  </div>
+  
+</div>
+
+<div class="section">
+  <h2>🔍 Test Observations & Defects (1)</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Severity</th>
+        <th>Category</th>
+        <th>Title</th>
+        <th>Expected vs Actual</th>
+        <th>Screenshot</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      <tr>
+        <td><code>OBS-1</code></td>
+        <td><span class="badge badge-status">low</span></td>
+        <td>Functional</td>
+        <td><strong>Display Ratio Check</strong><br><small style="color: var(--text-muted);">Aspect ratios verified with zero distortion.</small></td>
+        <td></td>
+        <td></td>
+      </tr>
+
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <h2>📸 Screenshot Evidence (0)</h2>
+<p style='color: var(--text-muted);'>No screenshots captured during this session.</p></div>
+
+<div class="section">
+  <h2>🔒 Cryptographic Evidence Manifest (SHA-256)</h2>
+  <table>
+    <thead><tr><th>File</th><th>Category</th><th>Size</th><th>SHA-256 Hash</th></tr></thead>
+    <tbody>
+
+      <tr>
+        <td><code>audit_test.txt</code></td>
+        <td>root</td>
+        <td>14 B</td>
+        <td><code style="font-size: 11px;">caf136d5c83c65d4515d3bdb7ce9c6d33cb59ab8138351140ec22e2e319c8404</code></td>
+      </tr>
+</tbody></table></div>
+
+<footer>
+  Generated by SUSCRCPY v3.0 &bull; Android Testing & Diagnostics Workstation &bull; Local & Offline Report
+</footer>
+</div>
+</body>
+</html>

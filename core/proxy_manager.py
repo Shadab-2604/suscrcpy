@@ -50,7 +50,11 @@ class ProxyManager(QObject):
     def get_device_proxy(self, serial: str) -> ProxyConfig:
         """Query Android global settings for the active HTTP proxy."""
         try:
-            raw = self.adb.run(["shell", "settings", "get", "global", "http_proxy"], serial=serial).strip()
+            res = self.adb.run(["shell", "settings", "get", "global", "http_proxy"], serial=serial)
+            if hasattr(res, "stdout"):
+                raw = res.stdout.strip() if res.stdout else ""
+            else:
+                raw = str(res).strip() if res else ""
             if raw and raw not in ("null", ":0", "0.0.0.0:0"):
                 if ":" in raw:
                     parts = raw.split(":", 1)

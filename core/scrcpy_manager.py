@@ -179,10 +179,16 @@ class ScrcpyManager(QObject):
         if sys.platform.startswith("linux") and "DISPLAY" in env:
             env["SDL_VIDEODRIVER"] = "x11"
 
+        # On Linux, wrap command with stdbuf -oL -eL to enforce line buffering so texture changes are received immediately
+        if sys.platform.startswith("linux") and shutil.which("stdbuf"):
+            final_cmd = ["stdbuf", "-oL", "-eL"] + cmd
+        else:
+            final_cmd = cmd
+
         try:
-            logger.info("Spawning scrcpy: %s", " ".join(cmd))
+            logger.info("Spawning scrcpy: %s", " ".join(final_cmd))
             proc = subprocess.Popen(
-                cmd,
+                final_cmd,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,  # Merge stderr into stdout for unified parsing
