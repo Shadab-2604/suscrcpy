@@ -124,9 +124,28 @@ class SettingsPanel(QtWidgets.QFrame):
         # ======================================================================
         app_box = QtWidgets.QGroupBox("Target Application")
         a_layout = QtWidgets.QVBoxLayout(app_box)
-        a_layout.setSpacing(8)
+        a_layout.setSpacing(6)
 
-        # Search/Dropdown Row
+        # Search Bar Row
+        search_row = QtWidgets.QHBoxLayout()
+        search_row.setSpacing(6)
+
+        self.app_search_input = QtWidgets.QLineEdit()
+        self.app_search_input.setPlaceholderText("🔍 Search apps by name or package (e.g. settings, chrome)...")
+        self.app_search_input.setClearButtonEnabled(True)
+        self.app_search_input.textChanged.connect(self._on_app_search_changed)
+        self.app_search_input.returnPressed.connect(self._on_search_return_pressed)
+        search_row.addWidget(self.app_search_input)
+
+        self.refresh_apps_btn = QtWidgets.QPushButton("↻")
+        self.refresh_apps_btn.setMaximumWidth(32)
+        self.refresh_apps_btn.setToolTip("Refresh installed packages via ADB")
+        self.refresh_apps_btn.clicked.connect(self.refresh_apps_requested)
+        search_row.addWidget(self.refresh_apps_btn)
+
+        a_layout.addLayout(search_row)
+
+        # Dropdown Row
         app_row = QtWidgets.QHBoxLayout()
         app_row.setSpacing(6)
 
@@ -134,12 +153,6 @@ class SettingsPanel(QtWidgets.QFrame):
         self.app_combo.addItem("All Applications (Full Device Logs)", "")
         self.app_combo.currentIndexChanged.connect(self._on_app_combo_changed)
         app_row.addWidget(self.app_combo, stretch=1)
-
-        self.refresh_apps_btn = QtWidgets.QPushButton("↻")
-        self.refresh_apps_btn.setMaximumWidth(32)
-        self.refresh_apps_btn.setToolTip("Refresh installed packages via ADB")
-        self.refresh_apps_btn.clicked.connect(self.refresh_apps_requested)
-        app_row.addWidget(self.refresh_apps_btn)
 
         a_layout.addLayout(app_row)
 
@@ -259,13 +272,20 @@ class SettingsPanel(QtWidgets.QFrame):
         self._all_apps = apps
         self._repopulate_app_combo()
 
+    def _on_app_search_changed(self, text: str) -> None:
+        self._repopulate_app_combo()
+
+    def _on_search_return_pressed(self) -> None:
+        # If user presses Enter in search bar and matching apps exist, select the first match
+        if self.app_combo.count() > 1:
+            self.app_combo.setCurrentIndex(1)
+
     def _on_app_filter_toggled(self) -> None:
         self._repopulate_app_combo()
 
     def _repopulate_app_combo(self) -> None:
         self._block_signals = True
         self.app_combo.clear()
-        self.app_combo.addItem("All Applications (Full Device Logs)", "")
 
         category = "all"
         if self.filter_user.isChecked():
@@ -273,7 +293,16 @@ class SettingsPanel(QtWidgets.QFrame):
         elif self.filter_system.isChecked():
             category = "system"
 
-        filtered = self.app_mgr.filter_apps(self._all_apps, category=category)
+        query = self.app_search_input.text().strip() if hasattr(self, "app_search_input") else ""
+        filtered = self.app_mgr.filter_apps(self._all_apps, query=query, category=category)
+
+        if query:
+            header_text = f"All Applications ({len(filtered)} matches found)"
+        else:
+            header_text = f"All Applications ({len(filtered)} loaded)"
+
+        self.app_combo.addItem(header_text, "")
+
         for app in filtered:
             type_tag = "[System]" if app.is_system else "[User]"
             label = f"{app.display_name} ({app.package_name}) {type_tag}"
