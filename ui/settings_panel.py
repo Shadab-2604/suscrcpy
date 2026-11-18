@@ -1,19 +1,36 @@
 """Screen and Application Settings panel (Right Upper Panel) for SUSCRCPY.
 
-Houses display resolution / aspect ratio controls and the installed application selector.
+Houses display resolution / aspect ratio controls and the installed application selector
+with orientation-aware dimension calculations, real-time GCD ratio, and search filtering.
 """
 from __future__ import annotations
 
 import logging
 import math
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from core.app_manager import AppInfo, AppManager
-from core.screen_manager import ScreenManager
+from core.screen_manager import ASPECT_RATIOS, ScreenManager
 
 logger = logging.getLogger("suscrcpy.ui.settings_panel")
+
+PRESET_RATIOS = [
+    "Custom (pixels)",
+    "1:1",
+    "3:2",
+    "4:3",
+    "5:4",
+    "16:9",
+    "16:10",
+    "18:9",
+    "19:9",
+    "19.5:9",
+    "20:9",
+    "21:9",
+    "32:9",
+]
 
 
 class SettingsPanel(QtWidgets.QFrame):
@@ -58,14 +75,13 @@ class SettingsPanel(QtWidgets.QFrame):
         r1 = QtWidgets.QHBoxLayout()
         r1.addWidget(QtWidgets.QLabel("Aspect Ratio:"))
         self.ratio_combo = QtWidgets.QComboBox()
-        self.ratio_combo.addItem("Custom (pixels)")
-        for preset in ["1:1", "4:3", "5:4", "16:9", "16:10", "18:9", "19.5:9", "20:9"]:
+        for preset in PRESET_RATIOS:
             self.ratio_combo.addItem(preset)
         self.ratio_combo.currentTextChanged.connect(self._on_preset_changed)
         r1.addWidget(self.ratio_combo, stretch=1)
 
         self.library_btn = QtWidgets.QPushButton("📚 Profiles")
-        self.library_btn.setToolTip("Browse Universal Screen Profiles Library")
+        self.library_btn.setToolTip("Browse Universal Screen Profiles Library (12 categories)")
         self.library_btn.clicked.connect(self.open_library_requested)
         r1.addWidget(self.library_btn)
 
@@ -112,7 +128,7 @@ class SettingsPanel(QtWidgets.QFrame):
 
         r3.addStretch()
 
-        self.gcd_ratio_lbl = QtWidgets.QLabel("Computed: 9:16")
+        self.gcd_ratio_lbl = QtWidgets.QLabel("Computed: 9:16 (portrait)")
         self.gcd_ratio_lbl.setStyleSheet("color: #4A90E2; font-size: 11px; font-weight: 500;")
         r3.addWidget(self.gcd_ratio_lbl)
         s_layout.addLayout(r3)
@@ -197,13 +213,40 @@ class SettingsPanel(QtWidgets.QFrame):
         self._block_ratio_sync = False
 
         self._update_gcd_ratio(width, height)
-        tag = "Override" if is_override else "Native"
+        tag = "Override Active" if is_override else "Hardware Native"
         self.active_res_lbl.setText(f"Active Resolution: {width} × {height} px ({tag})")
 
     def _update_gcd_ratio(self, w: int, h: int) -> None:
         if w > 0 and h > 0:
             g = math.gcd(w, h)
-            self.gcd_ratio_lbl.setText(f"Computed: {w // g}:{h // g}")
+            rw, rh = w // g, h // g
+            orient = "portrait" if h >= w else "landscape"
+            self.gcd_ratio_lbl.setText(f"Computed: {rw}:{rh} ({orient})")
+
+    def _get_active_ratio_factors(self) -> Optional[Tuple[float, float]]:
+        """Return (w_factor, h_factor) accurately mapped to the current device orientation."""
+        preset = self.ratio_combo.currentText()
+        if preset == "Custom (pixels)" or ":" not in preset:
+            return None
+        parts = preset.split(":")
+        try:
+            r1, r2 = float(parts[0]), float(parts[1])
+        except ValueError:
+            return None
+
+        cur_w = self.width_spin.value()
+        cur_h = self.height_spin.value()
+        is_portrait = cur_h >= cur_w
+
+        major = max(r1, r2)
+        minor = min(r1, r2)
+
+        if is_portrait:
+            # Portrait: Width is minor factor, Height is major factor
+            return (minor, major)
+        else:
+            # Landscape: Width is major factor, Height is minor factor
+            return (major, minor)
 
     def _on_preset_changed(self, preset_name: str) -> None:
         if preset_name == "Custom (pixels)" or self._block_ratio_sync:
@@ -225,17 +268,13 @@ class SettingsPanel(QtWidgets.QFrame):
         if self._block_ratio_sync:
             return
 
-        preset = self.ratio_combo.currentText()
-        if preset != "Custom (pixels)" and ":" in preset:
-            parts = preset.split(":")
-            try:
-                rw, rh = float(parts[0]), float(parts[1])
-                new_h = int(round(w * (rh / rw)))
-                self._block_ratio_sync = True
-                self.height_spin.setValue(new_h)
-                self._block_ratio_sync = False
-            except Exception:
-                pass
+        factors = self._get_active_ratio_factors()
+        if factors:
+            wf, hf = factors
+            new_h = int(round(w * (hf / wf)))
+            self._block_ratio_sync = True
+            self.height_spin.setValue(new_h)
+            self._block_ratio_sync = False
 
         self._update_gcd_ratio(self.width_spin.value(), self.height_spin.value())
 
@@ -243,17 +282,13 @@ class SettingsPanel(QtWidgets.QFrame):
         if self._block_ratio_sync:
             return
 
-        preset = self.ratio_combo.currentText()
-        if preset != "Custom (pixels)" and ":" in preset:
-            parts = preset.split(":")
-            try:
-                rw, rh = float(parts[0]), float(parts[1])
-                new_w = int(round(h * (rw / rh)))
-                self._block_ratio_sync = True
-                self.width_spin.setValue(new_w)
-                self._block_ratio_sync = False
-            except Exception:
-                pass
+        factors = self._get_active_ratio_factors()
+        if factors:
+            wf, hf = factors
+            new_w = int(round(h * (wf / hf)))
+            self._block_ratio_sync = True
+            self.width_spin.setValue(new_w)
+            self._block_ratio_sync = False
 
         self._update_gcd_ratio(self.width_spin.value(), self.height_spin.value())
 
@@ -263,7 +298,7 @@ class SettingsPanel(QtWidgets.QFrame):
         try:
             w, h = self.screen_mgr.validate_pixels(w, h)
             self.apply_resolution_requested.emit(w, h)
-            self.active_res_lbl.setText(f"Active Resolution: {w} × {h} px (Applied)")
+            self.active_res_lbl.setText(f"Active Resolution: {w} × {h} px (Override Active)")
         except ValueError as e:
             QtWidgets.QMessageBox.critical(self, "Invalid Dimensions", str(e))
 

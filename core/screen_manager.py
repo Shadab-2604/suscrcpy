@@ -66,27 +66,26 @@ class ScreenManager:
         current_h: int,
         ratio_name: str,
     ) -> Tuple[int, int]:
-        """Compute new width and height while preserving current orientation and long edge."""
+        """Compute new width and height while strictly preserving device orientation (portrait vs landscape)."""
         if ratio_name not in ASPECT_RATIOS:
             raise ValueError(f"Unknown aspect ratio preset: '{ratio_name}'")
 
-        rw, rh = ASPECT_RATIOS[ratio_name]
+        r1, r2 = ASPECT_RATIOS[ratio_name]
         is_portrait = current_h >= current_w
 
-        # If preset is already specified as portrait (rw < rh), adapt accordingly
-        if rw < rh:
-            target_rw, target_rh = rh, rw
-        else:
-            target_rw, target_rh = rw, rh
+        major = max(r1, r2)
+        minor = min(r1, r2)
 
         if is_portrait:
+            # Portrait: Height is the long edge (major factor), Width is the short edge (minor factor)
             long_edge = max(current_w, current_h)
             new_h = long_edge
-            new_w = round(long_edge * target_rh / target_rw)
+            new_w = round(long_edge * minor / major)
         else:
+            # Landscape: Width is the long edge (major factor), Height is the short edge (minor factor)
             long_edge = max(current_w, current_h)
             new_w = long_edge
-            new_h = round(long_edge * target_rh / target_rw)
+            new_h = round(long_edge * minor / major)
 
         self.validate_pixels(new_w, new_h)
         return new_w, new_h
@@ -99,62 +98,53 @@ class ScreenManager:
         gcd = math.gcd(width_px, height_px)
         return width_px // gcd, height_px // gcd
 
-    @staticmethod
-    def validate_pixels(width_val: object, height_val: object) -> Tuple[int, int]:
-        """Validate integer pixel dimensions within allowed bounds [100, 10000]."""
-        try:
-            w = int(width_val)
-            h = int(height_val)
-        except (ValueError, TypeError):
-            raise ValueError("Pixel width and height must be integer numbers.")
+    def validate_pixels(self, width: int, height: int) -> Tuple[int, int]:
+        """Ensure pixel dimensions are positive integers within the safe [100, 10000] range."""
+        if not (isinstance(width, int) and isinstance(height, int)):
+            raise ValueError(f"Pixel dimensions must be integers. Received ({type(width)}, {type(height)}).")
 
-        if w < 100 or w > 10000:
-            raise ValueError(f"Width {w}px is outside permitted range [100, 10000].")
-        if h < 100 or h > 10000:
-            raise ValueError(f"Height {h}px is outside permitted range [100, 10000].")
+        if not (100 <= width <= 10000 and 100 <= height <= 10000):
+            raise ValueError(
+                f"Resolution {width}x{height} outside supported safety limits [100 - 10000 px]. "
+                "Values below 100 or above 10000 may cause Android SurfaceFlinger crashes."
+            )
+        return width, height
 
-        return w, h
-
-    def apply_resolution(self, serial: str, width: int, height: int) -> Tuple[int, int]:
-        """Apply a custom or preset resolution to the Android device via ADB."""
-        w, h = self.validate_pixels(width, height)
-        # Ensure initial state is recorded before first modification
+    def apply_resolution(self, serial: str, width: int, height: int) -> None:
+        """Apply a resolution override via ADB 'wm size'."""
+        self.validate_pixels(width, height)
+        # Ensure we recorded initial state before first modification
         if serial not in self._original_overrides:
             self.record_initial_resolution(serial)
 
-        self.adb.set_display_size(serial, w, h)
+        logger.info("Applying resolution override %dx%d on %s", width, height, serial)
+        self.adb.set_display_size(serial, width, height)
         self._modified_devices.add(serial)
-        logger.info("Applied resolution %dx%d to device %s", w, h, serial)
-        return w, h
 
     def reset_resolution(self, serial: str) -> Tuple[int, int]:
-        """Reset the display resolution override back to native physical size."""
+        """Reset the display resolution override on the device."""
+        logger.info("Resetting resolution on device %s", serial)
         self.adb.reset_display_size(serial)
-        self._modified_devices.add(serial)
-        # Reading back the physical size
-        phys, _ = self.adb.get_display_size(serial)
-        logger.info("Reset resolution to native physical %dx%d for %s", phys[0], phys[1], serial)
-        return phys
+        self._modified_devices.discard(serial)
+        phys_res, _ = self.adb.get_display_size(serial)
+        return phys_res
 
     def restore_device(self, serial: str) -> None:
-        """Restore the initial resolution that existed when the application started."""
-        if serial not in self._modified_devices:
-            return
-
-        try:
-            original = self._original_overrides.get(serial)
-            if original is not None:
-                orig_w, orig_h = original
-                logger.info("Restoring original resolution %dx%d for %s", orig_w, orig_h, serial)
-                self.adb.set_display_size(serial, orig_w, orig_h)
-            else:
-                logger.info("Restoring native physical resolution (wm size reset) for %s", serial)
-                self.adb.reset_display_size(serial)
-            self._modified_devices.discard(serial)
-        except Exception as e:
-            logger.error("Failed to restore initial resolution for %s: %s", serial, e)
+        """Restore initial resolution on the specified device."""
+        self.reset_resolution(serial)
 
     def restore_all(self) -> None:
-        """Restore all modified devices on application shutdown."""
+        """Clean-up handler: safely restores initial state on all modified devices upon application exit."""
         for serial in list(self._modified_devices):
-            self.restore_device(serial)
+            try:
+                orig_override = self._original_overrides.get(serial)
+                if orig_override is not None:
+                    ow, oh = orig_override
+                    logger.info("Restoring original override %dx%d on %s", ow, oh, serial)
+                    self.adb.set_display_size(serial, ow, oh)
+                else:
+                    logger.info("Restoring native physical size on %s", serial)
+                    self.adb.reset_display_size(serial)
+            except Exception as e:
+                logger.error("Failed to restore display size for %s: %s", serial, e)
+        self._modified_devices.clear()

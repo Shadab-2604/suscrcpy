@@ -104,9 +104,10 @@ class ScrcpyManager(QObject):
         self,
         serial: str,
         borderless: bool = True,
+        quality_profile: str = "balanced",
         extra_args: Optional[List[str]] = None,
     ) -> Tuple[subprocess.Popen, str]:
-        """Start a new scrcpy session with a unique window title."""
+        """Start a new scrcpy session with a unique window title and configured stream profile."""
         if self.is_running():
             self.stop()
 
@@ -121,10 +122,16 @@ class ScrcpyManager(QObject):
             serial,
             "--window-title",
             window_title,
-            "--video-bit-rate=8M",
-            "--max-fps=60",
             "--stay-awake",
         ]
+
+        # Apply streaming quality profiles
+        if quality_profile == "performance":
+            cmd.extend(["--max-size=720", "--video-bit-rate=4M", "--max-fps=30"])
+        elif quality_profile == "high":
+            cmd.extend(["--video-bit-rate=16M", "--max-fps=60"])
+        else:  # balanced (default)
+            cmd.extend(["--max-size=1080", "--video-bit-rate=8M", "--max-fps=60"])
 
         if borderless:
             cmd.append("--window-borderless")

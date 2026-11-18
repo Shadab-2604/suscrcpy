@@ -18,6 +18,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from update_manager import (
     ArchiveSecurityError,
     ChecksumMismatchError,
+    NoReleasesPublishedError,
     PermissionRequiredError,
     ReleaseInfo,
     UpdateError,
@@ -32,7 +33,7 @@ class UpdateCheckWorker(QtCore.QThread):
     """Background thread to query GitHub Releases API without blocking the UI."""
 
     check_finished = QtCore.Signal(object)  # ReleaseInfo
-    check_failed = QtCore.Signal(str)       # Error message
+    check_failed = QtCore.Signal(str, bool)  # Error message, is_no_release_flag
 
     def __init__(self, manager: UpdateManager, parent: Optional[QtCore.QObject] = None) -> None:
         super().__init__(parent)
@@ -42,9 +43,12 @@ class UpdateCheckWorker(QtCore.QThread):
         try:
             release = self.manager.fetch_latest_release()
             self.check_finished.emit(release)
+        except NoReleasesPublishedError as e:
+            logger.info("No releases published yet on GitHub: %s", e)
+            self.check_failed.emit(str(e), True)
         except Exception as e:
             logger.error("Update check worker error: %s", e)
-            self.check_failed.emit(str(e))
+            self.check_failed.emit(str(e), False)
 
 
 class UpdateInstallWorker(QtCore.QThread):
@@ -163,15 +167,22 @@ class UpdateDialog(QtWidgets.QDialog):
         btn_layout.setSpacing(8)
 
         self.github_btn = QtWidgets.QPushButton("🌐 View on GitHub")
-        self.github_btn.setToolTip("Open GitHub release in web browser")
+        self.github_btn.setToolTip("Open GitHub releases in web browser")
         self.github_btn.clicked.connect(self._open_github_release)
         btn_layout.addWidget(self.github_btn)
+
+        self.retry_btn = QtWidgets.QPushButton("↻ Retry")
+        self.retry_btn.setToolTip("Retry checking GitHub for updates")
+        self.retry_btn.clicked.connect(self.start_check)
+        self.retry_btn.setVisible(False)
+        btn_layout.addWidget(self.retry_btn)
 
         btn_layout.addStretch()
 
         self.update_btn = QtWidgets.QPushButton("Update Now")
         self.update_btn.setObjectName("primaryBtn")
         self.update_btn.setEnabled(False)
+        self.update_btn.setVisible(False)
         self.update_btn.clicked.connect(self._start_update)
         btn_layout.addWidget(self.update_btn)
 
@@ -187,6 +198,8 @@ class UpdateDialog(QtWidgets.QDialog):
         self.status_lbl.setStyleSheet("font-size: 12px; font-weight: 500; color: #4A90E2;")
         self.progress_bar.setRange(0, 0)  # Indeterminate animation
         self.update_btn.setEnabled(False)
+        self.update_btn.setVisible(False)
+        self.retry_btn.setVisible(False)
         self.notes_text.setPlainText("Querying https://api.github.com...")
 
         self._check_worker = UpdateCheckWorker(self.manager, self)
@@ -197,34 +210,60 @@ class UpdateDialog(QtWidgets.QDialog):
     def _on_check_finished(self, release: ReleaseInfo) -> None:
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(100)
+        self.retry_btn.setVisible(False)
         self._current_release = release
 
         notes = f"Release: {release.name} ({release.tag_name})\nPublished: {release.published_at[:10]}\n\n{release.body}"
         self.notes_text.setPlainText(notes)
 
         if release.is_update_available:
-            self.status_lbl.setText(f"★ New version available: {release.version}")
+            self.status_lbl.setText(f"★ New version available: v{release.version}")
             self.status_lbl.setStyleSheet("font-size: 12px; font-weight: 600; color: #65B58A;")
             self.update_btn.setEnabled(True)
+            self.update_btn.setVisible(True)
             self.update_btn.setText(f"Update to v{release.version}")
         else:
-            self.status_lbl.setText(f"✓ SUSCRCPY is up to date (version {APP_VERSION}).")
+            self.status_lbl.setText(f"✓ You're using the latest version ({APP_VERSION}).")
             self.status_lbl.setStyleSheet("font-size: 12px; font-weight: 500; color: #65B58A;")
             self.update_btn.setEnabled(False)
+            self.update_btn.setVisible(False)
 
-    def _on_check_failed(self, error_msg: str) -> None:
+    def _on_check_failed(self, error_msg: str, is_no_release: bool) -> None:
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.status_lbl.setText("Failed to check for updates.")
-        self.status_lbl.setStyleSheet("font-size: 12px; font-weight: 600; color: #E05252;")
-        self.notes_text.setPlainText(f"Error: {error_msg}\n\nPlease check your internet connection or try again later.")
+        self.update_btn.setEnabled(False)
+        self.update_btn.setVisible(False)
+        self.retry_btn.setVisible(True)
+
+        if is_no_release:
+            self.status_lbl.setText("No published releases yet.")
+            self.status_lbl.setStyleSheet("font-size: 12px; font-weight: 500; color: #999999;")
+            self.notes_text.setPlainText(
+                f"No stable releases have been published on GitHub yet.\n\n"
+                f"Current installed version is v{APP_VERSION}.\n\n"
+                f"Check the repository releases page for announcements:\n{GITHUB_URL}/releases"
+            )
+        elif "rate limit" in error_msg.lower():
+            self.status_lbl.setText("GitHub API rate limit reached.")
+            self.status_lbl.setStyleSheet("font-size: 12px; font-weight: 600; color: #D9A441;")
+            self.notes_text.setPlainText(
+                "GitHub API rate limit exceeded for your IP address.\n"
+                "Please wait a few minutes before checking again."
+            )
+        else:
+            self.status_lbl.setText("Failed to connect to GitHub.")
+            self.status_lbl.setStyleSheet("font-size: 12px; font-weight: 600; color: #E05252;")
+            self.notes_text.setPlainText(
+                f"Connection error: {error_msg}\n\n"
+                "Please check your network connectivity and try again."
+            )
 
     def _open_github_release(self) -> None:
-        url = self._current_release.html_url if self._current_release else GITHUB_URL
+        url = self._current_release.html_url if self._current_release else f"{GITHUB_URL}/releases"
         QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
 
     def _start_update(self) -> None:
-        if not self._current_release:
+        if not self._current_release or not self._current_release.is_update_available:
             return
 
         target_dir = self.manager.install_dir
@@ -253,9 +292,10 @@ class UpdateDialog(QtWidgets.QDialog):
                 )
                 return
 
-        # Direct installation (when running with write access)
+        # Direct installation
         self.update_btn.setEnabled(False)
         self.close_btn.setEnabled(False)
+        self.retry_btn.setEnabled(False)
         self.progress_bar.setValue(0)
 
         self._install_worker = UpdateInstallWorker(self.manager, self._current_release, self)
@@ -307,7 +347,6 @@ class UpdateDialog(QtWidgets.QDialog):
             QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
         )
         if reply == QtWidgets.QMessageBox.StandardButton.Yes:
-            # Restart application
             QtCore.QProcess.startDetached(sys.executable, sys.argv)
             QtWidgets.QApplication.quit()
         else:
@@ -318,4 +357,5 @@ class UpdateDialog(QtWidgets.QDialog):
         self.status_lbl.setStyleSheet("font-size: 12px; font-weight: 600; color: #E05252;")
         self.close_btn.setEnabled(True)
         self.update_btn.setEnabled(True)
+        self.retry_btn.setEnabled(True)
         QtWidgets.QMessageBox.critical(self, "Update Failed", error)

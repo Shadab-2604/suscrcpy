@@ -121,37 +121,40 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Left Panel: Live Android Screen Container (Embedded scrcpy)
         self.screen_view = ScreenView(self.scrcpy_mgr)
+        self.screen_view.setMinimumWidth(380)
         self.main_splitter.addWidget(self.screen_view)
 
         # Right Area: Vertical Splitter (Settings on top, Logs on bottom)
         self.right_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
         self.right_splitter.setChildrenCollapsible(False)
+        self.right_splitter.setMinimumWidth(400)
 
         # Right Upper: Screen and Application Settings Panel
         self.settings_panel = SettingsPanel(self.screen_mgr, self.app_mgr)
+        self.settings_panel.setMinimumHeight(240)
         self.right_splitter.addWidget(self.settings_panel)
 
         # Right Lower: Android Logs Panel
         self.logs_panel = LogsPanel(self.log_mgr)
+        self.logs_panel.setMinimumHeight(220)
         self.right_splitter.addWidget(self.logs_panel)
 
-        # Set vertical proportions (Settings ~36%, Logs ~64%)
-        self.right_splitter.setStretchFactor(0, 36)
-        self.right_splitter.setStretchFactor(1, 64)
-
         self.main_splitter.addWidget(self.right_splitter)
-
-        # Set horizontal proportions (ScreenView ~43%, Controls ~57%)
-        self.main_splitter.setStretchFactor(0, 43)
-        self.main_splitter.setStretchFactor(1, 57)
-
         root_layout.addWidget(self.main_splitter, stretch=1)
+
+        # Keyboard shortcut for resetting layout
+        self.shortcut_reset_layout = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+L"), self)
+        self.shortcut_reset_layout.activated.connect(self.reset_layout)
+
+        # Restore saved splitter layout or initialize 50/50 division
+        self._restore_or_init_splitter_layout()
 
     def _connect_signals(self) -> None:
         # Header Bar Signals
         self.header_bar.device_selected.connect(self._on_device_selected)
         self.header_bar.refresh_requested.connect(self._on_refresh_devices)
         self.header_bar.check_updates_requested.connect(self._on_check_updates)
+        self.header_bar.reset_layout_requested.connect(self.reset_layout)
 
         # Device Manager Signals
         self.device_mgr.selected_device_changed.connect(self._on_device_details_changed)
@@ -322,8 +325,49 @@ class MainWindow(QtWidgets.QMainWindow):
         logger.warning("%s: %s", title, message)
         QtWidgets.QMessageBox.warning(self, title, message)
 
+    def _restore_or_init_splitter_layout(self) -> None:
+        """Restore saved splitter positions or enforce initial 50/50 division."""
+        settings = QtCore.QSettings("SUSCRCPY", "SUSCRCPY")
+        main_state = settings.value("mainSplitterState")
+        right_state = settings.value("rightSplitterState")
+        geom = settings.value("windowGeometry")
+
+        if geom:
+            self.restoreGeometry(geom)
+
+        if main_state:
+            self.main_splitter.restoreState(main_state)
+        else:
+            w = self.width() if self.width() > 100 else 1280
+            self.main_splitter.setSizes([w // 2, w // 2])
+
+        if right_state:
+            self.right_splitter.restoreState(right_state)
+        else:
+            h = self.height() if self.height() > 100 else 800
+            self.right_splitter.setSizes([int(h * 0.38), int(h * 0.62)])
+
+    def reset_layout(self) -> None:
+        """Reset splitter layout back to the ideal 50/50 screen/controls division."""
+        w = self.centralWidget().width() if self.centralWidget() else 1280
+        if w <= 100:
+            w = 1280
+        h = self.centralWidget().height() if self.centralWidget() else 800
+        if h <= 100:
+            h = 800
+
+        self.main_splitter.setSizes([w // 2, w // 2])
+        self.right_splitter.setSizes([int(h * 0.38), int(h * 0.62)])
+        logger.info("Main window layout reset to 50/50 division (%d / %d px)", w // 2, w // 2)
+
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         logger.info("Closing SUSCRCPY application...")
+        # Save splitter states and geometry for persistence
+        settings = QtCore.QSettings("SUSCRCPY", "SUSCRCPY")
+        settings.setValue("mainSplitterState", self.main_splitter.saveState())
+        settings.setValue("rightSplitterState", self.right_splitter.saveState())
+        settings.setValue("windowGeometry", self.saveGeometry())
+
         self._stop_active_sessions()
         self.screen_mgr.restore_all()
         ProcessManager.instance().cleanup_all()

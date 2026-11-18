@@ -10,7 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Unified Single-Window Desktop Interface**: Complete UI/UX redesign combining live scrcpy mirror, display settings, and logcat viewer into one cohesive native layout.
 - **Native Foreign Window Embedding**: Embedded scrcpy display using native X11/XWayland and Win32 reparenting APIs (`QWindow.fromWinId()`).
+- **50/50 Balanced Splitter Layout & Persistence**: True 50/50 default splitter proportions, layout persistence via `QSettings`, and one-click `⊞ Reset Layout` / <kbd>Ctrl+L</kbd> shortcut.
+- **Real-Time Application Package Search**: Instant search bar for filtering through hundreds of installed device applications by package name and label.
 - **Universal Screen Profiles Library**: Support for 12 hardware categories (Smartphones, Tablets, Foldables, Wearables, Laptops, Desktops, TVs, Gaming Handhelds, Automotive, Signage, XR, E-readers).
+- **Stream Quality Profiles**: Added `performance` (720p 4M 30fps), `balanced` (1080p 8M 60fps), and `high` (native 16M 60fps) scrcpy modes.
 - **Automated GitHub Update System**:
   - CLI update checks via `suscrcpy --check-updates`
   - Automated atomic updates via `sudo suscrcpy --update`
@@ -23,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Clean uninstallation script `uninstall.sh`
   - Desktop entry integration (`suscrcpy.desktop`)
 - **CI/CD Release Automation**: GitHub Actions workflow (`.github/workflows/release.yml`) for automated testing, packaging `suscrcpy-source.zip`, and GitHub release asset publishing.
+
+### Fixed
+- **Log Priority & False-Positive Counters**: Android log priority (`V, D, I, W, E, F`) is now strictly authoritative. Fixed false positives where informational video cache misses, try-catch notifications, and framework debug messages inflated error and crash counters.
+- **Aspect Ratio Orientation Inversion**: Fixed dimension calculation on portrait screens where landscape presets (e.g., 16:9) incorrectly shrank height instead of computing proper portrait proportions.
+- **Update Dialog 404 Handling**: Proper classification of HTTP 404 (when no releases are yet published) with retry options and automatic disabling of the "Update Now" action.
+- **Device Details Compatibility**: Added `cpu_architecture` alias property on `DeviceDetails` for backwards compatibility.
 
 ### Changed
 - Migrated legacy Tkinter codebase to modern PySide6 / Qt 6 architecture.

@@ -72,6 +72,10 @@ class DeviceDetails:
     ram_info: str
     connection_type: str  # USB or TCP/IP
 
+    @property
+    def cpu_architecture(self) -> str:
+        return self.cpu_abi
+
 
 class AdbManager:
     """Manages all interactions with the Android Debug Bridge."""

@@ -21,6 +21,7 @@ class HeaderBar(QtWidgets.QFrame):
     device_selected = QtCore.Signal(str)  # serial
     refresh_requested = QtCore.Signal()
     check_updates_requested = QtCore.Signal()
+    reset_layout_requested = QtCore.Signal()
 
     def __init__(self, device_manager: DeviceManager, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
@@ -76,6 +77,11 @@ class HeaderBar(QtWidgets.QFrame):
         self.refresh_btn.setToolTip("Scan for connected ADB devices")
         self.refresh_btn.clicked.connect(self.refresh_requested)
         right_layout.addWidget(self.refresh_btn)
+
+        self.layout_btn = QtWidgets.QPushButton("⊞ Reset Layout")
+        self.layout_btn.setToolTip("Reset screen and settings splitters to 50/50 division")
+        self.layout_btn.clicked.connect(self.reset_layout_requested)
+        right_layout.addWidget(self.layout_btn)
 
         self.updates_btn = QtWidgets.QPushButton("🔄 Updates")
         self.updates_btn.setToolTip("Check for software updates on GitHub")

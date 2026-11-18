@@ -49,6 +49,11 @@ class UpdateError(RuntimeError):
     pass
 
 
+class NoReleasesPublishedError(UpdateError):
+    """Raised when repository exists but no release tags are published yet."""
+    pass
+
+
 class ChecksumMismatchError(UpdateError):
     """Raised when SHA-256 hash does not match SHA256SUMS."""
     pass
@@ -136,8 +141,8 @@ class UpdateManager:
                 data = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                raise UpdateError(
-                    f"No published releases found on GitHub repository ({GITHUB_URL})."
+                raise NoReleasesPublishedError(
+                    f"No stable releases have been published yet on GitHub repository ({GITHUB_URL})."
                 ) from e
             if e.code in (403, 429):
                 raise UpdateError(

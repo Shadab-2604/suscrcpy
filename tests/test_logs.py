@@ -53,6 +53,26 @@ class TestLogs(unittest.TestCase):
         self.assertTrue(res_stack.is_crash)
         self.assertTrue(res_stack.is_stack_trace)
 
+    def test_no_false_positives_on_info_messages(self):
+        # Informational messages containing words like 'error', 'failed', 'cache', 'exception'
+        # must NOT be classified as errors or crashes
+        res1 = self.detector.analyze("I", "VideoCache", "Cache miss for video segment error_fallback")
+        self.assertEqual(res1.severity, LogSeverity.INFO)
+        self.assertFalse(res1.is_error)
+        self.assertFalse(res1.is_crash)
+
+        res2 = self.detector.analyze("D", "AuthManager", "Token validation failed gracefully, requesting refresh")
+        self.assertEqual(res2.severity, LogSeverity.DEBUG)
+        self.assertFalse(res2.is_error)
+        self.assertFalse(res2.is_crash)
+
+        res3 = self.detector.analyze("I", "TryCatchTest", "Handled NullPointerException in local try-catch block")
+        self.assertEqual(res3.severity, LogSeverity.INFO)
+        self.assertFalse(res3.is_error)
+        self.assertFalse(res3.is_crash)
+        self.assertEqual(self.detector.error_count, 0)
+        self.assertEqual(self.detector.crash_count, 0)
+
     def test_log_export(self):
         entries = [
             LogEntry(
