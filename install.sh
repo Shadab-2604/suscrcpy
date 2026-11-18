@@ -96,6 +96,12 @@ exec /usr/bin/python3 /opt/suscrcpy/main.py "$@"
 EOF
 chmod 755 /usr/local/bin/suscrcpy
 
+mkdir -p /usr/share/icons/hicolor/scalable/apps
+if [ -f "$TARGET_DIR/resources/icons/suscrcpy.svg" ]; then
+    cp "$TARGET_DIR/resources/icons/suscrcpy.svg" /usr/share/icons/hicolor/scalable/apps/suscrcpy.svg
+    chmod 644 /usr/share/icons/hicolor/scalable/apps/suscrcpy.svg
+fi
+
 mkdir -p /usr/share/applications
 cat << 'EOF' > /usr/share/applications/suscrcpy.desktop
 [Desktop Entry]
@@ -104,12 +110,17 @@ Name=SUSCRCPY
 GenericName=Android Device Testing Desktop Application
 Comment=Live screen mirroring, display ratio controller, and logcat monitor
 Exec=/usr/local/bin/suscrcpy
-Icon=utilities-terminal
+Icon=suscrcpy
 Terminal=false
 Categories=Development;Utility;Security;
 Keywords=android;scrcpy;adb;testing;security;qa;
+StartupWMClass=suscrcpy
 EOF
 chmod 644 /usr/share/applications/suscrcpy.desktop
+
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
+fi
 
 if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database /usr/share/applications 2>/dev/null || true
