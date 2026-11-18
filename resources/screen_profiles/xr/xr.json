@@ -1,0 +1,144 @@
+[
+  {
+    "id": "xr-meta-quest-3",
+    "category": "xr",
+    "platform": "android",
+    "manufacturer": "Meta",
+    "model": "Quest 3",
+    "screen_name": "Dual LCD Binocular (2064x2208 per eye)",
+    "resolution": {
+      "width_px": 4128,
+      "height_px": 2208
+    },
+    "aspect_ratio": {
+      "width": 187,
+      "height": 100
+    },
+    "density": {
+      "dpi": 1218,
+      "scale_factor": 4.0
+    },
+    "logical_viewport": {
+      "width_dp": 1032,
+      "height_dp": 552
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 60,
+      "bottom": 60,
+      "left": 60,
+      "right": 60
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "xr": {
+      "enabled": true,
+      "per_eye_width_px": 2064,
+      "per_eye_height_px": 2208,
+      "fov_deg": 110.0,
+      "ipd_mm": 65.0,
+      "stereo_mode": "side_by_side",
+      "distortion_profile": "Pancake Lens Mesh"
+    },
+    "refresh_rate_hz": 120,
+    "profile_source": "verified",
+    "verified": true,
+    "notes": "VR stereo headset layout with dual-eye rendering and optical safe-area."
+  },
+  {
+    "id": "xr-apple-vision-pro",
+    "category": "xr",
+    "platform": "visionos",
+    "manufacturer": "Apple",
+    "model": "Apple Vision Pro",
+    "screen_name": "Dual Micro-OLED (3660x3200 per eye)",
+    "resolution": {
+      "width_px": 7320,
+      "height_px": 3200
+    },
+    "aspect_ratio": {
+      "width": 183,
+      "height": 80
+    },
+    "density": {
+      "dpi": 3386,
+      "scale_factor": 3.0
+    },
+    "logical_viewport": {
+      "width_dp": 2440,
+      "height_dp": 1066
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 80,
+      "bottom": 80,
+      "left": 80,
+      "right": 80
+    },
+    "xr": {
+      "enabled": true,
+      "per_eye_width_px": 3660,
+      "per_eye_height_px": 3200,
+      "fov_deg": 100.0,
+      "ipd_mm": 64.0,
+      "stereo_mode": "side_by_side",
+      "distortion_profile": "Custom 3D Catadioptric"
+    },
+    "refresh_rate_hz": 96,
+    "profile_source": "verified",
+    "verified": true
+  },
+  {
+    "id": "xr-ar-glasses-generic",
+    "category": "xr",
+    "platform": "generic",
+    "manufacturer": "Generic",
+    "model": "Optical See-Through AR Glasses",
+    "screen_name": "Dual 1080p Waveguide Displays",
+    "resolution": {
+      "width_px": 3840,
+      "height_px": 1080
+    },
+    "aspect_ratio": {
+      "width": 32,
+      "height": 9
+    },
+    "density": {
+      "dpi": 600,
+      "scale_factor": 2.0
+    },
+    "logical_viewport": {
+      "width_dp": 1920,
+      "height_dp": 540
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 40,
+      "bottom": 40,
+      "left": 80,
+      "right": 80
+    },
+    "xr": {
+      "enabled": true,
+      "per_eye_width_px": 1920,
+      "per_eye_height_px": 1080,
+      "fov_deg": 52.0,
+      "ipd_mm": 63.5,
+      "stereo_mode": "side_by_side",
+      "distortion_profile": "Diffractive Waveguide"
+    },
+    "refresh_rate_hz": 90,
+    "profile_source": "generic",
+    "verified": false
+  }
+]

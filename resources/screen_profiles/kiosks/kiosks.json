@@ -1,0 +1,128 @@
+[
+  {
+    "id": "kiosk-pos-terminal-10in",
+    "category": "kiosk",
+    "platform": "generic",
+    "manufacturer": "Generic",
+    "model": "Retail POS Terminal 10-inch",
+    "screen_name": "Standard POS 4:3",
+    "resolution": {
+      "width_px": 1024,
+      "height_px": 768
+    },
+    "aspect_ratio": {
+      "width": 4,
+      "height": 3
+    },
+    "density": {
+      "dpi": 132,
+      "scale_factor": 1.0
+    },
+    "logical_viewport": {
+      "width_dp": 1024,
+      "height_dp": 768
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 20,
+      "bottom": 20,
+      "left": 20,
+      "right": 20
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 60,
+    "profile_source": "generic",
+    "verified": true
+  },
+  {
+    "id": "kiosk-atm-screen-12in",
+    "category": "kiosk",
+    "platform": "generic",
+    "manufacturer": "Generic",
+    "model": "Banking ATM Terminal",
+    "screen_name": "High-Contrast 5:4 Sunlight Screen",
+    "resolution": {
+      "width_px": 1280,
+      "height_px": 1024
+    },
+    "aspect_ratio": {
+      "width": 5,
+      "height": 4
+    },
+    "density": {
+      "dpi": 136,
+      "scale_factor": 1.0
+    },
+    "logical_viewport": {
+      "width_dp": 1280,
+      "height_dp": 1024
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 32,
+      "bottom": 32,
+      "left": 32,
+      "right": 32
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 60,
+    "profile_source": "generic",
+    "verified": true
+  },
+  {
+    "id": "kiosk-portrait-totem-32in",
+    "category": "kiosk",
+    "platform": "android",
+    "manufacturer": "Generic",
+    "model": "Self-Service Ordering Kiosk 32-inch",
+    "screen_name": "Portrait Touch Totem FHD",
+    "resolution": {
+      "width_px": 1080,
+      "height_px": 1920
+    },
+    "aspect_ratio": {
+      "width": 9,
+      "height": 16
+    },
+    "density": {
+      "dpi": 69,
+      "scale_factor": 1.0
+    },
+    "logical_viewport": {
+      "width_dp": 1080,
+      "height_dp": 1920
+    },
+    "orientation": "portrait",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 40,
+      "bottom": 60,
+      "left": 30,
+      "right": 30
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 60,
+    "profile_source": "generic",
+    "verified": true
+  }
+]

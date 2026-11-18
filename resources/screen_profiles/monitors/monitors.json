@@ -1,0 +1,261 @@
+[
+  {
+    "id": "monitor-fhd-1080p",
+    "category": "monitor",
+    "platform": "generic",
+    "manufacturer": "Generic",
+    "model": "Standard 24-inch (FHD)",
+    "screen_name": "1920x1080 16:9",
+    "resolution": {
+      "width_px": 1920,
+      "height_px": 1080
+    },
+    "aspect_ratio": {
+      "width": 16,
+      "height": 9
+    },
+    "density": {
+      "dpi": 92,
+      "scale_factor": 1.0
+    },
+    "logical_viewport": {
+      "width_dp": 1920,
+      "height_dp": 1080
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 0,
+      "bottom": 48,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 60,
+    "profile_source": "generic",
+    "verified": true
+  },
+  {
+    "id": "monitor-qhd-1440p",
+    "category": "monitor",
+    "platform": "generic",
+    "manufacturer": "Generic",
+    "model": "Standard 27-inch (QHD / 2K)",
+    "screen_name": "2560x1440 16:9",
+    "resolution": {
+      "width_px": 2560,
+      "height_px": 1440
+    },
+    "aspect_ratio": {
+      "width": 16,
+      "height": 9
+    },
+    "density": {
+      "dpi": 109,
+      "scale_factor": 1.0
+    },
+    "logical_viewport": {
+      "width_dp": 2560,
+      "height_dp": 1440
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 0,
+      "bottom": 48,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 144,
+    "profile_source": "generic",
+    "verified": true
+  },
+  {
+    "id": "monitor-4k-uhd",
+    "category": "monitor",
+    "platform": "generic",
+    "manufacturer": "Generic",
+    "model": "32-inch 4K UHD Monitor",
+    "screen_name": "3840x2160 16:9",
+    "resolution": {
+      "width_px": 3840,
+      "height_px": 2160
+    },
+    "aspect_ratio": {
+      "width": 16,
+      "height": 9
+    },
+    "density": {
+      "dpi": 138,
+      "scale_factor": 1.5
+    },
+    "logical_viewport": {
+      "width_dp": 2560,
+      "height_dp": 1440
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 0,
+      "bottom": 48,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 60,
+    "profile_source": "generic",
+    "verified": true
+  },
+  {
+    "id": "monitor-ultrawide-34in",
+    "category": "monitor",
+    "platform": "generic",
+    "manufacturer": "Generic",
+    "model": "34-inch Ultrawide Curved (21:9)",
+    "screen_name": "3440x1440 UW-QHD",
+    "resolution": {
+      "width_px": 3440,
+      "height_px": 1440
+    },
+    "aspect_ratio": {
+      "width": 21,
+      "height": 9
+    },
+    "density": {
+      "dpi": 110,
+      "scale_factor": 1.0
+    },
+    "logical_viewport": {
+      "width_dp": 3440,
+      "height_dp": 1440
+    },
+    "orientation": "landscape",
+    "shape": "curved",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 0,
+      "bottom": 48,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 120,
+    "profile_source": "generic",
+    "verified": true
+  },
+  {
+    "id": "monitor-super-ultrawide-49in",
+    "category": "monitor",
+    "platform": "generic",
+    "manufacturer": "Generic",
+    "model": "49-inch Super Ultrawide (32:9)",
+    "screen_name": "5120x1440 Dual QHD",
+    "resolution": {
+      "width_px": 5120,
+      "height_px": 1440
+    },
+    "aspect_ratio": {
+      "width": 32,
+      "height": 9
+    },
+    "density": {
+      "dpi": 109,
+      "scale_factor": 1.0
+    },
+    "logical_viewport": {
+      "width_dp": 5120,
+      "height_dp": 1440
+    },
+    "orientation": "landscape",
+    "shape": "curved",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 0,
+      "bottom": 48,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 144,
+    "profile_source": "generic",
+    "verified": true
+  },
+  {
+    "id": "monitor-dual-fhd-layout",
+    "category": "monitor",
+    "platform": "generic",
+    "manufacturer": "Generic",
+    "model": "Dual-Monitor Workspace (2x FHD)",
+    "screen_name": "Combined 3840x1080 Canvas",
+    "resolution": {
+      "width_px": 3840,
+      "height_px": 1080
+    },
+    "aspect_ratio": {
+      "width": 32,
+      "height": 9
+    },
+    "density": {
+      "dpi": 92,
+      "scale_factor": 1.0
+    },
+    "logical_viewport": {
+      "width_dp": 3840,
+      "height_dp": 1080
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 0,
+      "bottom": 48,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "dual_screen": {
+      "enabled": true,
+      "secondary_width_px": 1920,
+      "secondary_height_px": 1080,
+      "layout": "horizontal"
+    },
+    "refresh_rate_hz": 60,
+    "profile_source": "generic",
+    "verified": false,
+    "notes": "Two side-by-side 1080p monitors forming a continuous canvas."
+  }
+]

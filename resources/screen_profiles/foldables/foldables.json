@@ -1,0 +1,292 @@
+[
+  {
+    "id": "foldable-zfold5-inner",
+    "category": "foldable",
+    "platform": "android",
+    "manufacturer": "Samsung",
+    "model": "Galaxy Z Fold 5",
+    "screen_name": "Main Inner Display",
+    "resolution": {
+      "width_px": 1812,
+      "height_px": 2176
+    },
+    "aspect_ratio": {
+      "width": 5,
+      "height": 6
+    },
+    "density": {
+      "dpi": 374,
+      "scale_factor": 2.33
+    },
+    "logical_viewport": {
+      "width_dp": 778,
+      "height_dp": 934
+    },
+    "orientation": "portrait",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 48,
+      "bottom": 48,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": true,
+      "posture": "unfolded",
+      "hinge": {
+        "position": 906,
+        "width": 10,
+        "orientation": "vertical"
+      },
+      "display_mode": "inner"
+    },
+    "refresh_rate_hz": 120,
+    "profile_source": "verified",
+    "verified": true,
+    "notes": "Unfolded main 7.6-inch tablet-style screen."
+  },
+  {
+    "id": "foldable-zfold5-cover",
+    "category": "foldable",
+    "platform": "android",
+    "manufacturer": "Samsung",
+    "model": "Galaxy Z Fold 5",
+    "screen_name": "Cover Outer Display",
+    "resolution": {
+      "width_px": 904,
+      "height_px": 2316
+    },
+    "aspect_ratio": {
+      "width": 23.1,
+      "height": 9
+    },
+    "density": {
+      "dpi": 402,
+      "scale_factor": 2.5
+    },
+    "logical_viewport": {
+      "width_dp": 361,
+      "height_dp": 926
+    },
+    "orientation": "portrait",
+    "shape": "rectangle",
+    "cutouts": [
+      {
+        "type": "punch_hole",
+        "x": 452,
+        "y": 35,
+        "width": 26,
+        "height": 26,
+        "radius": 13
+      }
+    ],
+    "safe_areas": {
+      "top": 70,
+      "bottom": 48,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": true,
+      "posture": "closed",
+      "hinge": null,
+      "display_mode": "cover"
+    },
+    "refresh_rate_hz": 120,
+    "profile_source": "verified",
+    "verified": true,
+    "notes": "Closed tall 6.2-inch outer screen (23.1:9 aspect ratio)."
+  },
+  {
+    "id": "foldable-zfold5-tabletop",
+    "category": "foldable",
+    "platform": "android",
+    "manufacturer": "Samsung",
+    "model": "Galaxy Z Fold 5",
+    "screen_name": "Half-Open Tabletop Posture",
+    "resolution": {
+      "width_px": 1812,
+      "height_px": 2176
+    },
+    "aspect_ratio": {
+      "width": 5,
+      "height": 6
+    },
+    "density": {
+      "dpi": 374,
+      "scale_factor": 2.33
+    },
+    "logical_viewport": {
+      "width_dp": 778,
+      "height_dp": 934
+    },
+    "orientation": "portrait",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 48,
+      "bottom": 48,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": true,
+      "posture": "tabletop",
+      "hinge": {
+        "position": 1088,
+        "width": 24,
+        "orientation": "horizontal"
+      },
+      "display_mode": "inner"
+    },
+    "refresh_rate_hz": 120,
+    "profile_source": "verified",
+    "verified": true,
+    "notes": "Flex mode posture with horizontal hinge split."
+  },
+  {
+    "id": "foldable-zflip5-main",
+    "category": "foldable",
+    "platform": "android",
+    "manufacturer": "Samsung",
+    "model": "Galaxy Z Flip 5",
+    "screen_name": "Main Foldable Display",
+    "resolution": {
+      "width_px": 1080,
+      "height_px": 2640
+    },
+    "aspect_ratio": {
+      "width": 22,
+      "height": 9
+    },
+    "density": {
+      "dpi": 426,
+      "scale_factor": 2.62
+    },
+    "logical_viewport": {
+      "width_dp": 412,
+      "height_dp": 1008
+    },
+    "orientation": "portrait",
+    "shape": "rectangle",
+    "cutouts": [
+      {
+        "type": "punch_hole",
+        "x": 540,
+        "y": 35,
+        "width": 26,
+        "height": 26,
+        "radius": 13
+      }
+    ],
+    "safe_areas": {
+      "top": 70,
+      "bottom": 50,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": true,
+      "posture": "unfolded",
+      "hinge": {
+        "position": 1320,
+        "width": 12,
+        "orientation": "horizontal"
+      },
+      "display_mode": "inner"
+    },
+    "refresh_rate_hz": 120,
+    "profile_source": "verified",
+    "verified": true
+  },
+  {
+    "id": "foldable-zflip5-cover",
+    "category": "foldable",
+    "platform": "android",
+    "manufacturer": "Samsung",
+    "model": "Galaxy Z Flip 5",
+    "screen_name": "Flex Window Outer Screen",
+    "resolution": {
+      "width_px": 720,
+      "height_px": 748
+    },
+    "aspect_ratio": {
+      "width": 1,
+      "height": 1
+    },
+    "density": {
+      "dpi": 306,
+      "scale_factor": 2.0
+    },
+    "logical_viewport": {
+      "width_dp": 360,
+      "height_dp": 374
+    },
+    "orientation": "portrait",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 20,
+      "bottom": 20,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": true,
+      "posture": "closed",
+      "hinge": null,
+      "display_mode": "cover"
+    },
+    "refresh_rate_hz": 60,
+    "profile_source": "verified",
+    "verified": true
+  },
+  {
+    "id": "foldable-trifold-generic",
+    "category": "foldable",
+    "platform": "android",
+    "manufacturer": "Generic",
+    "model": "Tri-Fold Concept Device",
+    "screen_name": "Full Tri-Fold Canvas",
+    "resolution": {
+      "width_px": 2880,
+      "height_px": 2160
+    },
+    "aspect_ratio": {
+      "width": 4,
+      "height": 3
+    },
+    "density": {
+      "dpi": 380,
+      "scale_factor": 2.37
+    },
+    "logical_viewport": {
+      "width_dp": 1215,
+      "height_dp": 911
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 36,
+      "bottom": 36,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": true,
+      "posture": "unfolded",
+      "hinge": {
+        "position": 960,
+        "width": 8,
+        "orientation": "vertical"
+      },
+      "display_mode": "inner"
+    },
+    "refresh_rate_hz": 120,
+    "profile_source": "generic",
+    "verified": false,
+    "notes": "10-inch 3-panel dual-hinge foldable screen preview."
+  }
+]

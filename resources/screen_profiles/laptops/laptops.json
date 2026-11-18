@@ -1,0 +1,179 @@
+[
+  {
+    "id": "laptop-macbook-pro-16",
+    "category": "laptop",
+    "platform": "macos",
+    "manufacturer": "Apple",
+    "model": "MacBook Pro 16-inch",
+    "screen_name": "Liquid Retina XDR",
+    "resolution": {
+      "width_px": 3456,
+      "height_px": 2234
+    },
+    "aspect_ratio": {
+      "width": 16,
+      "height": 10
+    },
+    "density": {
+      "dpi": 254,
+      "scale_factor": 2.0
+    },
+    "logical_viewport": {
+      "width_dp": 1728,
+      "height_dp": 1117
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [
+      {
+        "type": "notch",
+        "x": 1728,
+        "y": 0,
+        "width": 160,
+        "height": 74,
+        "radius": 12
+      }
+    ],
+    "safe_areas": {
+      "top": 74,
+      "bottom": 0,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 120,
+    "profile_source": "verified",
+    "verified": true
+  },
+  {
+    "id": "laptop-dell-xps-15-fhd",
+    "category": "laptop",
+    "platform": "windows",
+    "manufacturer": "Dell",
+    "model": "XPS 15 (FHD+)",
+    "screen_name": "InfinityEdge Non-Touch",
+    "resolution": {
+      "width_px": 1920,
+      "height_px": 1200
+    },
+    "aspect_ratio": {
+      "width": 16,
+      "height": 10
+    },
+    "density": {
+      "dpi": 145,
+      "scale_factor": 1.0
+    },
+    "logical_viewport": {
+      "width_dp": 1920,
+      "height_dp": 1200
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 0,
+      "bottom": 40,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 60,
+    "profile_source": "verified",
+    "verified": true
+  },
+  {
+    "id": "laptop-chromebook-generic",
+    "category": "laptop",
+    "platform": "chromeos",
+    "manufacturer": "Generic",
+    "model": "Chromebook 14-inch",
+    "screen_name": "FHD Display",
+    "resolution": {
+      "width_px": 1920,
+      "height_px": 1080
+    },
+    "aspect_ratio": {
+      "width": 16,
+      "height": 9
+    },
+    "density": {
+      "dpi": 157,
+      "scale_factor": 1.0
+    },
+    "logical_viewport": {
+      "width_dp": 1920,
+      "height_dp": 1080
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 0,
+      "bottom": 48,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 60,
+    "profile_source": "generic",
+    "verified": false
+  },
+  {
+    "id": "laptop-workstation-4k",
+    "category": "laptop",
+    "platform": "windows",
+    "manufacturer": "Generic",
+    "model": "17-inch Mobile Workstation (4K UHD)",
+    "screen_name": "4K IPS Panel",
+    "resolution": {
+      "width_px": 3840,
+      "height_px": 2160
+    },
+    "aspect_ratio": {
+      "width": 16,
+      "height": 9
+    },
+    "density": {
+      "dpi": 259,
+      "scale_factor": 2.0
+    },
+    "logical_viewport": {
+      "width_dp": 1920,
+      "height_dp": 1080
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 0,
+      "bottom": 48,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 60,
+    "profile_source": "generic",
+    "verified": false
+  }
+]

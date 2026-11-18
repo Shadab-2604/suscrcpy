@@ -1,0 +1,129 @@
+[
+  {
+    "id": "automotive-tesla-model3-center",
+    "category": "automotive",
+    "platform": "generic",
+    "manufacturer": "Tesla",
+    "model": "Model 3 / Model Y",
+    "screen_name": "15.4-inch Landscape Center Touchscreen",
+    "resolution": {
+      "width_px": 1920,
+      "height_px": 1200
+    },
+    "aspect_ratio": {
+      "width": 16,
+      "height": 10
+    },
+    "density": {
+      "dpi": 147,
+      "scale_factor": 1.0
+    },
+    "logical_viewport": {
+      "width_dp": 1920,
+      "height_dp": 1200
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 24,
+      "bottom": 60,
+      "left": 40,
+      "right": 40
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 60,
+    "profile_source": "verified",
+    "verified": true,
+    "notes": "Automotive infotainment center screen layout with bottom vehicle controls safe-area."
+  },
+  {
+    "id": "automotive-portrait-infotainment-generic",
+    "category": "automotive",
+    "platform": "android",
+    "manufacturer": "Generic",
+    "model": "Vertical Dashboard Display",
+    "screen_name": "12-inch Portrait Automotive Screen",
+    "resolution": {
+      "width_px": 1080,
+      "height_px": 1920
+    },
+    "aspect_ratio": {
+      "width": 9,
+      "height": 16
+    },
+    "density": {
+      "dpi": 183,
+      "scale_factor": 1.2
+    },
+    "logical_viewport": {
+      "width_dp": 900,
+      "height_dp": 1600
+    },
+    "orientation": "portrait",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 36,
+      "bottom": 80,
+      "left": 24,
+      "right": 24
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 60,
+    "profile_source": "generic",
+    "verified": false
+  },
+  {
+    "id": "automotive-panoramic-cluster-generic",
+    "category": "automotive",
+    "platform": "generic",
+    "manufacturer": "Generic",
+    "model": "Panoramic Cockpit Pillar-to-Pillar",
+    "screen_name": "Panoramic Ultrawide Cluster",
+    "resolution": {
+      "width_px": 3840,
+      "height_px": 720
+    },
+    "aspect_ratio": {
+      "width": 16,
+      "height": 3
+    },
+    "density": {
+      "dpi": 130,
+      "scale_factor": 1.0
+    },
+    "logical_viewport": {
+      "width_dp": 3840,
+      "height_dp": 720
+    },
+    "orientation": "landscape",
+    "shape": "curved",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 20,
+      "bottom": 20,
+      "left": 40,
+      "right": 40
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 60,
+    "profile_source": "generic",
+    "verified": false
+  }
+]

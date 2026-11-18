@@ -1,0 +1,130 @@
+[
+  {
+    "id": "ereader-kindle-paperwhite-11",
+    "category": "ereader",
+    "platform": "generic",
+    "manufacturer": "Amazon",
+    "model": "Kindle Paperwhite (6.8-inch)",
+    "screen_name": "E Ink Carta 1200 Monochrome",
+    "resolution": {
+      "width_px": 1236,
+      "height_px": 1648
+    },
+    "aspect_ratio": {
+      "width": 3,
+      "height": 4
+    },
+    "density": {
+      "dpi": 300,
+      "scale_factor": 1.87
+    },
+    "logical_viewport": {
+      "width_dp": 661,
+      "height_dp": 881
+    },
+    "orientation": "portrait",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 32,
+      "bottom": 32,
+      "left": 24,
+      "right": 24
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 15,
+    "profile_source": "verified",
+    "verified": true,
+    "notes": "300 DPI high-contrast monochrome E-ink screen."
+  },
+  {
+    "id": "ereader-colour-kaleido3-generic",
+    "category": "ereader",
+    "platform": "android",
+    "manufacturer": "Generic",
+    "model": "Colour E-Reader (Kaleido 3)",
+    "screen_name": "7.8-inch Colour E-Ink",
+    "resolution": {
+      "width_px": 1404,
+      "height_px": 1872
+    },
+    "aspect_ratio": {
+      "width": 3,
+      "height": 4
+    },
+    "density": {
+      "dpi": 300,
+      "scale_factor": 1.87
+    },
+    "logical_viewport": {
+      "width_dp": 750,
+      "height_dp": 1000
+    },
+    "orientation": "portrait",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 36,
+      "bottom": 36,
+      "left": 30,
+      "right": 30
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 30,
+    "profile_source": "generic",
+    "verified": false,
+    "notes": "Colour E-Ink with 150 DPI color / 300 DPI B&W resolution."
+  },
+  {
+    "id": "ereader-large-10in-generic",
+    "category": "ereader",
+    "platform": "android",
+    "manufacturer": "Generic",
+    "model": "10.3-inch Digital Notebook",
+    "screen_name": "Mobius Flexible E-Ink Display",
+    "resolution": {
+      "width_px": 1404,
+      "height_px": 1872
+    },
+    "aspect_ratio": {
+      "width": 3,
+      "height": 4
+    },
+    "density": {
+      "dpi": 227,
+      "scale_factor": 1.42
+    },
+    "logical_viewport": {
+      "width_dp": 988,
+      "height_dp": 1318
+    },
+    "orientation": "portrait",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 40,
+      "bottom": 40,
+      "left": 40,
+      "right": 40
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 20,
+    "profile_source": "generic",
+    "verified": false
+  }
+]

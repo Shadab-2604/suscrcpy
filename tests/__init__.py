@@ -1,0 +1,1 @@
+"""SUSCRCPY test suite."""

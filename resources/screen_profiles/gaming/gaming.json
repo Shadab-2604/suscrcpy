@@ -1,0 +1,128 @@
+[
+  {
+    "id": "gaming-steam-deck",
+    "category": "gaming",
+    "platform": "linux",
+    "manufacturer": "Valve",
+    "model": "Steam Deck",
+    "screen_name": "7-inch Optically Bonded Display",
+    "resolution": {
+      "width_px": 1280,
+      "height_px": 800
+    },
+    "aspect_ratio": {
+      "width": 16,
+      "height": 10
+    },
+    "density": {
+      "dpi": 215,
+      "scale_factor": 1.25
+    },
+    "logical_viewport": {
+      "width_dp": 1024,
+      "height_dp": 640
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 0,
+      "bottom": 0,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 60,
+    "profile_source": "verified",
+    "verified": true
+  },
+  {
+    "id": "gaming-nintendo-switch-oled",
+    "category": "gaming",
+    "platform": "generic",
+    "manufacturer": "Nintendo",
+    "model": "Nintendo Switch (OLED)",
+    "screen_name": "7-inch OLED Handheld Display",
+    "resolution": {
+      "width_px": 1280,
+      "height_px": 720
+    },
+    "aspect_ratio": {
+      "width": 16,
+      "height": 9
+    },
+    "density": {
+      "dpi": 210,
+      "scale_factor": 1.0
+    },
+    "logical_viewport": {
+      "width_dp": 1280,
+      "height_dp": 720
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 0,
+      "bottom": 0,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 60,
+    "profile_source": "verified",
+    "verified": true
+  },
+  {
+    "id": "gaming-rog-ally",
+    "category": "gaming",
+    "platform": "windows",
+    "manufacturer": "ASUS",
+    "model": "ROG Ally",
+    "screen_name": "7-inch FHD 120Hz Panel",
+    "resolution": {
+      "width_px": 1920,
+      "height_px": 1080
+    },
+    "aspect_ratio": {
+      "width": 16,
+      "height": 9
+    },
+    "density": {
+      "dpi": 314,
+      "scale_factor": 1.5
+    },
+    "logical_viewport": {
+      "width_dp": 1280,
+      "height_dp": 720
+    },
+    "orientation": "landscape",
+    "shape": "rectangle",
+    "cutouts": [],
+    "safe_areas": {
+      "top": 0,
+      "bottom": 0,
+      "left": 0,
+      "right": 0
+    },
+    "foldable": {
+      "enabled": false,
+      "posture": null,
+      "hinge": null,
+      "display_mode": null
+    },
+    "refresh_rate_hz": 120,
+    "profile_source": "verified",
+    "verified": true
+  }
+]
