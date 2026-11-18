@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from PySide6.QtCore import QObject, Signal
 
@@ -111,6 +111,51 @@ class AppManager(QObject):
         """Set the active application for targeted testing and logging."""
         self._selected_app = app
         self.app_selected.emit(app)
+
+    def launch_app(self, serial: str, package_name: str) -> Tuple[bool, str]:
+        """Launch the application's default launcher activity via monkey."""
+        try:
+            logger.info("Launching package %s on %s...", package_name, serial)
+            res = self.adb.run(
+                ["shell", "monkey", "-p", package_name, "-c", "android.intent.category.LAUNCHER", "1"],
+                serial=serial,
+            )
+            return True, f"Launched {package_name}"
+        except Exception as e:
+            logger.error("Failed to launch package %s on %s: %s", package_name, serial, e)
+            return False, f"Failed to launch: {e}"
+
+    def force_stop_app(self, serial: str, package_name: str) -> Tuple[bool, str]:
+        """Force terminate application process via am force-stop."""
+        try:
+            logger.info("Force stopping package %s on %s...", package_name, serial)
+            self.adb.run(["shell", "am", "force-stop", package_name], serial=serial)
+            return True, f"Force-stopped {package_name}"
+        except Exception as e:
+            logger.error("Failed to force stop %s on %s: %s", package_name, serial, e)
+            return False, f"Failed to stop: {e}"
+
+    def get_app_permissions(self, serial: str, package_name: str) -> List[str]:
+        """Retrieve granted permissions for the package via dumpsys."""
+        permissions: List[str] = []
+        try:
+            raw = self.adb.run(["shell", "dumpsys", "package", package_name], serial=serial)
+            in_perms = False
+            for line in raw.splitlines():
+                line = line.strip()
+                if "grantedPermissions:" in line or "requested permissions:" in line:
+                    in_perms = True
+                    continue
+                if in_perms:
+                    if line.startswith("android.permission."):
+                        perm = line.split(":")[0].strip()
+                        if perm not in permissions:
+                            permissions.append(perm)
+                    elif line and not line.startswith("android.permission.") and ":" in line:
+                        in_perms = False
+        except Exception as e:
+            logger.debug("Failed to read permissions for %s: %s", package_name, e)
+        return permissions
 
     def filter_apps(
         self,

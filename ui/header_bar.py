@@ -22,6 +22,7 @@ class HeaderBar(QtWidgets.QFrame):
     refresh_requested = QtCore.Signal()
     check_updates_requested = QtCore.Signal()
     reset_layout_requested = QtCore.Signal()
+    session_action_requested = QtCore.Signal()
 
     def __init__(self, device_manager: DeviceManager, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
@@ -72,6 +73,12 @@ class HeaderBar(QtWidgets.QFrame):
         self.status_dot.setObjectName("statusDot")
         self.status_dot.setStyleSheet(f"color: {COLOR_ERROR};")
         right_layout.addWidget(self.status_dot)
+
+        self.session_chip = QtWidgets.QPushButton("📋 No Active Session")
+        self.session_chip.setStyleSheet("background: #18202C; border: 1px solid #263345; color: #8DA2BC; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;")
+        self.session_chip.setToolTip("Click to view or start a Testing Session")
+        self.session_chip.clicked.connect(self.session_action_requested)
+        right_layout.addWidget(self.session_chip)
 
         self.refresh_btn = QtWidgets.QPushButton("↻ Refresh")
         self.refresh_btn.setToolTip("Scan for connected ADB devices")
@@ -137,6 +144,20 @@ class HeaderBar(QtWidgets.QFrame):
         else:
             color = COLOR_ERROR
             text = f"● {state_str}"
+        self.status_dot.setText(text)
+        self.status_dot.setStyleSheet(f"color: {color};")
+
+    def update_session_badge(self, session_id: Optional[str], status: str) -> None:
+        """Update session badge in header."""
+        if not session_id or status in ("Completed", "Interrupted"):
+            self.session_chip.setText("📋 No Active Session")
+            self.session_chip.setStyleSheet("background: #18202C; border: 1px solid #263345; color: #8DA2BC; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;")
+        elif status == "Running":
+            self.session_chip.setText(f"● {session_id} [RUNNING]")
+            self.session_chip.setStyleSheet("background: rgba(16, 185, 129, 0.2); border: 1px solid #10B981; color: #34D399; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;")
+        elif status == "Paused":
+            self.session_chip.setText(f"⏸ {session_id} [PAUSED]")
+            self.session_chip.setStyleSheet("background: rgba(245, 158, 11, 0.2); border: 1px solid #F59E0B; color: #FBBF24; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;")
 
         self.status_dot.setText(text)
         self.status_dot.setStyleSheet(f"color: {color}; font-weight: 600;")

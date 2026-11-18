@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-11-18
+
+### Added
+- **Testing Session Manager**:
+  - Full session lifecycle (`Created`, `Running`, `Paused`, `Completed`, `Interrupted`).
+  - Unique session ID generation (`SUS-YYYYMMDD-XXXX`).
+  - Binds device specifications, target application, test types, and tester notes into a unified context.
+  - Startup detection and recovery of interrupted testing sessions.
+- **Device Screenshot Capture & Non-Destructive Annotation**:
+  - Direct ADB framebuffer extraction (`screencap -p`), avoiding desktop window overlap.
+  - Interactive review dialog with non-destructive vector annotation tools (Boxes, Arrows, Text, Redaction/Blur).
+  - Preserves original raw capture while saving `_annotated.png` copy.
+- **Native Android Screen Recording**:
+  - Device display recording with real-time duration counter and file size tracking.
+  - Safe MP4 finalization via signal interruption before device pull (guaranteeing valid MP4 `moov` atoms).
+  - Device disconnect recovery preserving partial recordings.
+- **Network Proxy Manager**:
+  - Global Android HTTP/HTTPS proxy configuration (`settings put global http_proxy`).
+  - Socket-level reachability and connectivity testing.
+  - Security testing guidance panel for Burp Suite, OWASP ZAP, and mitmproxy.
+- **Defect Observations & Bug Notes**:
+  - Structured observation logging (Severity, Category, Expected, Actual).
+  - Direct attachment of captured screenshots and error log excerpts.
+- **Session Event Timeline**:
+  - Chronological event tracking across device connections, app actions, resolution changes, captures, and errors.
+  - Exportable to `timeline.json`.
+- **Evidence Integrity & File System**:
+  - Structured evidence hierarchy (`SUSCRCPY-Evidence/<Project>/<Session_ID>/`).
+  - Automated cryptographic SHA-256 manifest generation (`evidence_manifest.json`).
+  - Low disk space warning system.
+- **Comprehensive HTML Test Session Report Generator**:
+  - Standalone, responsive dark/light HTML report for developer sharing.
+  - Compiles diagnostics, timeline, observations, screenshot gallery, recordings, and SHA-256 manifest.
+- **Testing Workstation UI/UX**:
+  - Embedded quick toolbar (Screenshot `Ctrl+Shift+S`, Record `Ctrl+Shift+R`, Note `Ctrl+Shift+O`, Quality, Fullscreen).
+  - Tabbed right-side workstation: `Device & Apps`, `Screen Profiles`, `Testing Session`, `Network & Proxy`, `Test Notes`, `Evidence Files`.
+  - Header session badge indicator and quick session switcher.
+
 ## [2.1.0] - 2026-11-18
 
 ### Added

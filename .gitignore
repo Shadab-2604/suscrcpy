@@ -44,7 +44,9 @@ coverage.xml
 .pytest_cache/
 cover/
 
-# Environments
+# Testing Sessions & Evidence
+SUSCRCPY-Evidence/
+-f
 .env
 .venv
 env/

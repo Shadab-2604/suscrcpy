@@ -254,11 +254,18 @@ class LogManager(QObject):
         self.adb = adb_manager
         self._worker: Optional[LogStreamWorker] = None
         self._full_export_buffer: List[LogEntry] = []
+        self._critical_errors_sample: List[str] = []
+        self._disk_log_file: Optional[Path] = None
+        self._disk_file_handle: Optional[Any] = None
         self._visible_buffer_size = 3000
         self._start_time: Optional[str] = None
         self._mode = "Full Device"
         self._target_package: Optional[str] = None
         self._serial: Optional[str] = None
+
+    @property
+    def critical_errors_sample(self) -> List[str]:
+        return list(self._critical_errors_sample)
 
     @property
     def is_streaming(self) -> bool:
@@ -280,13 +287,28 @@ class LogManager(QObject):
     def start_time(self) -> Optional[str]:
         return self._start_time
 
-    def start_capture(self, serial: str, target_package: Optional[str] = None) -> None:
+    def start_capture(
+        self,
+        serial: str,
+        target_package: Optional[str] = None,
+        disk_log_path: Optional[Path] = None,
+    ) -> None:
         """Start streaming logs in either Full Device mode or Target Application mode."""
         self.stop_capture()
         self._serial = serial
         self._target_package = target_package
         self._mode = f"App: {target_package}" if target_package else "Full Device"
         self._start_time = time.strftime("%Y-%m-%d %H:%M:%S")
+
+        if disk_log_path:
+            disk_log_path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                self._disk_log_file = disk_log_path
+                self._disk_file_handle = open(disk_log_path, "a", encoding="utf-8", buffering=1)
+                self._disk_file_handle.write(f"\n--- LOGCAT CAPTURE STARTED: {self._start_time} [{self._mode}] ---\n")
+            except Exception as e:
+                logger.error("Could not open disk log file %s: %s", disk_log_path, e)
+                self._disk_file_handle = None
 
         self._worker = LogStreamWorker(
             adb_manager=self.adb,
@@ -304,6 +326,15 @@ class LogManager(QObject):
 
     def _handle_batch(self, batch: List[LogEntry]) -> None:
         self._full_export_buffer.extend(batch)
+        if self._disk_file_handle:
+            try:
+                for entry in batch:
+                    self._disk_file_handle.write(entry.raw + "\n")
+                    if entry.level in ("ERROR", "CRASH"):
+                        if len(self._critical_errors_sample) < 150:
+                            self._critical_errors_sample.append(f"[{entry.level}] {entry.tag}: {entry.message}")
+            except Exception as e:
+                logger.warning("Error writing to disk log: %s", e)
         self.new_logs_batch.emit(batch)
 
     def pause_capture(self) -> None:
@@ -319,11 +350,19 @@ class LogManager(QObject):
             self.status_updated.emit("Log display resumed")
 
     def stop_capture(self) -> None:
-        """Stop the streaming logcat worker."""
+        """Stop the streaming logcat worker and finalize disk log file."""
         if self._worker:
             self._worker.stop()
             self._worker = None
             self.status_updated.emit("Log capture stopped")
+        if self._disk_file_handle:
+            try:
+                self._disk_file_handle.write(f"--- LOGCAT CAPTURE STOPPED: {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+                self._disk_file_handle.flush()
+                self._disk_file_handle.close()
+            except Exception as e:
+                logger.debug("Error closing disk log file: %s", e)
+            self._disk_file_handle = None
 
     def clear_view(self) -> None:
         """Clear local in-memory view buffer without modifying device buffer."""

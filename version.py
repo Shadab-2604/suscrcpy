@@ -4,8 +4,8 @@ from __future__ import annotations
 from typing import Tuple
 
 APP_NAME = "SUSCRCPY"
-APP_TITLE = "SUSCRCPY — Android Device Testing Desktop Application"
-APP_VERSION = "2.1.0"
+APP_TITLE = "SUSCRCPY — Android Testing & Diagnostics Workstation"
+APP_VERSION = "3.0.0"
 GITHUB_OWNER = "Shadab-2604"
 GITHUB_REPO = "suscrcpy"
 GITHUB_URL = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}"

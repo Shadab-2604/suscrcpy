@@ -11,6 +11,7 @@ class TestCommandLineInterface(unittest.TestCase):
     """Test suite for CLI argument parser and commands."""
 
     def test_version_flag_output(self) -> None:
+        from version import APP_VERSION
         res = subprocess.run(
             [sys.executable, "main.py", "--version"],
             capture_output=True,
@@ -19,7 +20,7 @@ class TestCommandLineInterface(unittest.TestCase):
         )
         self.assertEqual(res.returncode, 0)
         self.assertIn("SUSCRCPY", res.stdout)
-        self.assertIn("2.1.0", res.stdout)
+        self.assertIn(APP_VERSION, res.stdout)
 
     def test_help_flag_output(self) -> None:
         res = subprocess.run(
