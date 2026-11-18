@@ -3,7 +3,7 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtWidgets import QApplication
 
-if not QGuiApplication.instance():
-    _qt_test_app = QGuiApplication(["suscrcpy_tests", "-platform", "offscreen"])
+if not QApplication.instance():
+    _qt_test_app = QApplication(["suscrcpy_tests", "-platform", "offscreen"])

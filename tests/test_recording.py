@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtWidgets import QApplication
 
 from core.adb_manager import AdbManager
 from core.recording_manager import RecordingManager, RecordingMetadata
@@ -16,8 +16,8 @@ from core.recording_manager import RecordingManager, RecordingMetadata
 class TestRecordingManager(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        if not QGuiApplication.instance():
-            cls.app = QGuiApplication([])
+        if not QApplication.instance():
+            cls.app = QApplication([])
 
     def setUp(self):
         self.temp_dir = Path(tempfile.mkdtemp(prefix="suscrcpy_test_rec_"))

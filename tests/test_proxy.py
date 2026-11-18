@@ -4,7 +4,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock
 
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtWidgets import QApplication
 
 from core.adb_manager import AdbManager
 from core.proxy_manager import ProxyManager
@@ -13,8 +13,8 @@ from core.proxy_manager import ProxyManager
 class TestProxyManager(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        if not QGuiApplication.instance():
-            cls.app = QGuiApplication([])
+        if not QApplication.instance():
+            cls.app = QApplication([])
 
     def setUp(self):
         self.mock_adb = MagicMock(spec=AdbManager)

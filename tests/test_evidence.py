@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtWidgets import QApplication
 
 from core.evidence_manager import EvidenceManager
 
@@ -15,8 +15,8 @@ from core.evidence_manager import EvidenceManager
 class TestEvidenceManager(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        if not QGuiApplication.instance():
-            cls.app = QGuiApplication([])
+        if not QApplication.instance():
+            cls.app = QApplication([])
 
     def setUp(self):
         self.temp_dir = Path(tempfile.mkdtemp(prefix="suscrcpy_test_evidence_"))

@@ -46,6 +46,7 @@ cover/
 
 # Testing Sessions & Evidence
 SUSCRCPY-Evidence/
+.github/
 -f
 .env
 .venv

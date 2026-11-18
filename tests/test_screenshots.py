@@ -17,9 +17,9 @@ from core.screenshot_manager import ScreenshotManager, ScreenshotMetadata
 class TestScreenshotManager(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        from PySide6.QtGui import QGuiApplication
-        if not QGuiApplication.instance():
-            cls.app = QGuiApplication([])
+        from PySide6.QtWidgets import QApplication
+        if not QApplication.instance():
+            cls.app = QApplication([])
 
     def setUp(self):
         self.temp_dir = Path(tempfile.mkdtemp(prefix="suscrcpy_test_shots_"))

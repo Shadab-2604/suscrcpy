@@ -8,11 +8,11 @@
 
 ## 1. Automated Test Suite Summary
 
-Total Automated Tests: **56**  
-Tests Passed: **56**  
+Total Automated Tests: **62**  
+Tests Passed: **62**  
 Failures: **0**  
 Errors: **0**  
-Execution Duration: **1.389s**  
+Execution Duration: **1.870s**  
 Pass Rate: **100% PASS**
 
 ```
@@ -33,6 +33,51 @@ test_parse_args_check_updates (test_cli.TestCommandLineInterface.test_parse_args
 test_parse_args_options (test_cli.TestCommandLineInterface.test_parse_args_options) ... ok
 test_parse_args_update (test_cli.TestCommandLineInterface.test_parse_args_update) ... ok
 test_version_flag_output (test_cli.TestCommandLineInterface.test_version_flag_output) ... ok
+test_directory_hierarchy_initialization (test_evidence.TestEvidenceManager.test_directory_hierarchy_initialization) ... ok
+test_manifest_generation_and_checksums (test_evidence.TestEvidenceManager.test_manifest_generation_and_checksums) ... ok
+test_crash_pattern_and_stack_trace_grouping (test_logs.TestLogs.test_crash_pattern_and_stack_trace_grouping) ... ok
+test_error_severity_detection (test_logs.TestLogs.test_error_severity_detection) ... ok
+test_log_export (test_logs.TestLogs.test_log_export) ... ok
+test_no_false_positives_on_info_messages (test_logs.TestLogs.test_no_false_positives_on_info_messages) ... ok
+test_threadtime_regex_parsing (test_logs.TestLogs.test_threadtime_regex_parsing) ... ok
+test_custom_profile_lifecycle (test_profiles.TestProfileManager.test_custom_profile_lifecycle) ... ok
+test_database_loads_all_categories (test_profiles.TestProfileManager.test_database_loads_all_categories) ... ok
+test_search_and_filter (test_profiles.TestProfileManager.test_search_and_filter) ... ok
+test_all_12_categories_exist (test_profiles.TestProfileModel.test_all_12_categories_exist) ... ok
+test_foldable_properties (test_profiles.TestProfileModel.test_foldable_properties) ... ok
+test_gcd_aspect_ratio_calculation (test_profiles.TestProfileModel.test_gcd_aspect_ratio_calculation) ... ok
+test_invalid_profile_rejection (test_profiles.TestProfileModel.test_invalid_profile_rejection) ... ok
+test_window_size_classes (test_profiles.TestProfileModel.test_window_size_classes) ... ok
+test_xr_properties (test_profiles.TestProfileModel.test_xr_properties) ... ok
+test_clear_device_proxy (test_proxy.TestProxyManager.test_clear_device_proxy) ... ok
+test_get_device_proxy_configured (test_proxy.TestProxyManager.test_get_device_proxy_configured) ... ok
+test_get_device_proxy_disabled (test_proxy.TestProxyManager.test_get_device_proxy_disabled) ... ok
+test_set_device_proxy (test_proxy.TestProxyManager.test_set_device_proxy) ... ok
+test_landscape_ratios (test_ratios.TestRatioCalculations.test_landscape_ratios) ... ok
+test_pixel_bounds_validation (test_ratios.TestRatioCalculations.test_pixel_bounds_validation) ... ok
+test_portrait_ratios (test_ratios.TestRatioCalculations.test_portrait_ratios) ... ok
+test_resolution_restoration_lifecycle (test_ratios.TestRatioCalculations.test_resolution_restoration_lifecycle) ... ok
+test_recording_lifecycle (test_recording.TestRecordingManager.test_recording_lifecycle) ... ok
+test_generate_html_report_content (test_reports.TestReportGenerator.test_generate_html_report_content) ... ok
+test_all_19_presets_present (test_screen_sync.TestScreenSynchronization.test_all_19_presets_present) ... ok
+test_fitted_geometry_letterboxing (test_screen_sync.TestScreenSynchronization.test_fitted_geometry_letterboxing) ... ok
+test_fitted_geometry_original_1to1_mode (test_screen_sync.TestScreenSynchronization.test_fitted_geometry_original_1to1_mode) ... ok
+test_fitted_geometry_pillarboxing (test_screen_sync.TestScreenSynchronization.test_fitted_geometry_pillarboxing) ... ok
+test_fitted_geometry_square_ratio (test_screen_sync.TestScreenSynchronization.test_fitted_geometry_square_ratio) ... ok
+test_step4_verification_applied_successfully (test_screen_sync.TestScreenSynchronization.test_step4_verification_applied_successfully) ... ok
+test_non_destructive_annotation (test_screenshots.TestScreenshotManager.test_non_destructive_annotation) ... ok
+test_generate_session_id_format (test_sessions.TestSessionManager.test_generate_session_id_format) ... ok
+test_interrupted_session_detection_and_recovery (test_sessions.TestSessionManager.test_interrupted_session_detection_and_recovery) ... ok
+test_session_lifecycle_and_persistence (test_sessions.TestSessionManager.test_session_lifecycle_and_persistence) ... ok
+test_parse_release_json_newer_available (test_updates.TestUpdateManager.test_parse_release_json_newer_available) ... ok
+test_parse_release_json_no_update_available (test_updates.TestUpdateManager.test_parse_release_json_no_update_available) ... ok
+test_rollback_on_failed_verification (test_updates.TestUpdateManager.test_rollback_on_failed_verification) ... ok
+test_update_aborts_on_checksum_mismatch (test_updates.TestUpdateManager.test_update_aborts_on_checksum_mismatch) ... ok
+test_app_version_is_valid_semver (test_versions.TestVersionManagement.test_app_version_is_valid_semver) ... ok
+test_final_versus_prerelease_comparison (test_versions.TestVersionManagement.test_final_versus_prerelease_comparison) ... ok
+test_parse_semver_basic (test_versions.TestVersionManagement.test_parse_semver_basic) ... ok
+test_parse_semver_prerelease (test_versions.TestVersionManagement.test_parse_semver_prerelease) ... ok
+test_version_comparisons (test_versions.TestVersionManagement.test_version_comparisons) ... ok
 test_directory_hierarchy_initialization (test_evidence.TestEvidenceManager.test_directory_hierarchy_initialization) ... ok
 test_manifest_generation_and_checksums (test_evidence.TestEvidenceManager.test_manifest_generation_and_checksums) ... ok
 test_crash_pattern_and_stack_trace_grouping (test_logs.TestLogs.test_crash_pattern_and_stack_trace_grouping) ... ok

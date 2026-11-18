@@ -217,6 +217,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.screen_view.quick_note_requested.connect(self._on_quick_note)
         self.screen_view.quality_changed.connect(self._on_quality_changed)
         self.screen_view.fullscreen_toggled.connect(self._on_fullscreen_toggled)
+        self.screen_view.resync_requested.connect(self._on_resync_requested)
+        self.screen_view.reset_resolution_requested.connect(self._on_reset_resolution)
 
         # Recording Manager Signals
         self.recording_mgr.recording_started.connect(lambda _: self.screen_view.set_recording_state(True, 0))
@@ -323,6 +325,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         w, h = details.override_resolution or details.physical_resolution
         self.settings_panel.set_current_dimensions(w, h, is_override=bool(details.override_resolution))
+        self.screen_view.set_android_dimensions(w, h)
         self.app_mgr.load_applications(serial)
 
         # Start live scrcpy mirror
@@ -474,13 +477,14 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         try:
-            self.screen_mgr.apply_resolution(self._active_serial, width, height)
-            self.settings_panel.set_current_dimensions(width, height, is_override=True)
+            verified_w, verified_h = self.screen_mgr.apply_resolution(self._active_serial, width, height)
+            self.settings_panel.set_current_dimensions(verified_w, verified_h, is_override=True)
+            self.screen_view.set_android_dimensions(verified_w, verified_h)
             self.scrcpy_mgr.restart(self._active_serial)
             self.event_mgr.record_event(
                 category="screen",
                 action="resolution_applied",
-                description=f"Applied custom display resolution {width}x{height}",
+                description=f"Applied custom display resolution {verified_w}x{verified_h}",
                 device_serial=self._active_serial,
             )
         except Exception as e:
@@ -494,6 +498,7 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             phys_res = self.screen_mgr.reset_resolution(self._active_serial)
             self.settings_panel.set_current_dimensions(phys_res[0], phys_res[1], is_override=False)
+            self.screen_view.set_android_dimensions(phys_res[0], phys_res[1])
             self.scrcpy_mgr.restart(self._active_serial)
             self.event_mgr.record_event(
                 category="screen",
@@ -504,14 +509,35 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception as e:
             self._show_error("Reset Resolution Error", str(e))
 
+    def _on_resync_requested(self) -> None:
+        """Handle manual re-sync trigger from ScreenView HUD."""
+        if not self._active_serial:
+            return
+        logger.info("Manual re-sync requested for device %s", self._active_serial)
+        try:
+            phys_res, override_res = self.adb.get_display_size(self._active_serial)
+            active_w, active_h = override_res if override_res else phys_res
+            self.screen_view.set_android_dimensions(active_w, active_h)
+            self.settings_panel.set_current_dimensions(active_w, active_h, is_override=bool(override_res))
+            self.scrcpy_mgr.restart(self._active_serial)
+            self.event_mgr.record_event(
+                category="screen",
+                action="resync",
+                description=f"Re-synchronized display at {active_w}x{active_h}",
+                device_serial=self._active_serial,
+            )
+        except Exception as e:
+            self._show_error("Re-Sync Error", str(e))
+
     def _on_profile_applied(self, profile: ScreenProfile) -> None:
         """Apply a universal screen profile selected from the library."""
         if not self._active_serial:
             self._show_warning("No Device Selected", "Connect and select an authorized device first.")
             return
         try:
-            self.screen_mgr.apply_resolution(self._active_serial, profile.width, profile.height)
-            self.settings_panel.set_current_dimensions(profile.width, profile.height, is_override=True)
+            verified_w, verified_h = self.screen_mgr.apply_resolution(self._active_serial, profile.width, profile.height)
+            self.settings_panel.set_current_dimensions(verified_w, verified_h, is_override=True)
+            self.screen_view.set_android_dimensions(verified_w, verified_h)
             self.scrcpy_mgr.restart(self._active_serial)
             self.event_mgr.record_event(
                 category="screen",

@@ -7,15 +7,18 @@ from core.screen_manager import ASPECT_RATIOS, ScreenManager
 class DummyAdb:
     def __init__(self):
         self.calls = []
+        self.override = None
 
     def get_display_size(self, serial):
-        return (1080, 2400), None
+        return (1080, 2400), self.override
 
     def set_display_size(self, serial, w, h):
         self.calls.append(("set", serial, w, h))
+        self.override = (w, h)
 
     def reset_display_size(self, serial):
         self.calls.append(("reset", serial))
+        self.override = None
 
 
 class TestRatioCalculations(unittest.TestCase):

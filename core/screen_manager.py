@@ -14,13 +14,25 @@ from core.adb_manager import AdbError, AdbManager
 logger = logging.getLogger("suscrcpy.screen_manager")
 
 # Presets mapping label to (ratio_width, ratio_height)
+# Supports all 19 standardized aspect ratio presets (both portrait and landscape equivalents)
 ASPECT_RATIOS: Dict[str, Tuple[int, int]] = {
+    # 1:1 Neutral Square
     "1:1": (1, 1),
+    # Common Standards
     "3:2": (3, 2),
     "4:3": (4, 3),
     "5:4": (5, 4),
-    "16:9": (16, 9),
     "16:10": (16, 10),
+    # Portrait equivalents (Standard & Modern smartphones)
+    "9:16": (9, 16),
+    "9:18": (9, 18),
+    "9:19": (9, 19),
+    "9:19.5": (18, 39),
+    "9:20": (9, 20),
+    "9:21": (9, 21),
+    "9:22": (9, 22),
+    # Landscape equivalents (Monitors, handhelds, widescreen & ultrawide)
+    "16:9": (16, 9),
     "18:9": (18, 9),
     "19:9": (19, 9),
     "19.5:9": (39, 18),
@@ -28,11 +40,6 @@ ASPECT_RATIOS: Dict[str, Tuple[int, int]] = {
     "21:9": (21, 9),
     "22:9": (22, 9),
     "32:9": (32, 9),
-    "9:16": (9, 16),
-    "9:18": (9, 18),
-    "9:19.5": (18, 39),
-    "9:20": (9, 20),
-    "9:21": (9, 21),
 }
 
 RESOLUTION_NOTICE = (
@@ -110,8 +117,11 @@ class ScreenManager:
             )
         return width, height
 
-    def apply_resolution(self, serial: str, width: int, height: int) -> None:
-        """Apply a resolution override via ADB 'wm size'."""
+    def apply_resolution(self, serial: str, width: int, height: int, verify: bool = True) -> Tuple[int, int]:
+        """Apply a resolution override via ADB 'wm size' and verify actual application on device.
+
+        Returns verified (override_w, override_h) tuple.
+        """
         self.validate_pixels(width, height)
         # Ensure we recorded initial state before first modification
         if serial not in self._original_overrides:
@@ -121,11 +131,32 @@ class ScreenManager:
         self.adb.set_display_size(serial, width, height)
         self._modified_devices.add(serial)
 
+        if verify:
+            # Step 4 verification: SurfaceFlinger applies wm size asynchronously
+            import time
+            time.sleep(0.12)
+            _, override_res = self.adb.get_display_size(serial)
+            retries = 3
+            while override_res != (width, height) and retries > 0:
+                time.sleep(0.15)
+                _, override_res = self.adb.get_display_size(serial)
+                retries -= 1
+
+            if override_res != (width, height):
+                logger.warning(
+                    "Resolution verification warning on %s: requested %dx%d but device reports override=%s",
+                    serial, width, height, override_res
+                )
+            return override_res or (width, height)
+        return width, height
+
     def reset_resolution(self, serial: str) -> Tuple[int, int]:
         """Reset the display resolution override on the device."""
+        import time
         logger.info("Resetting resolution on device %s", serial)
         self.adb.reset_display_size(serial)
         self._modified_devices.discard(serial)
+        time.sleep(0.12)
         phys_res, _ = self.adb.get_display_size(serial)
         return phys_res
 

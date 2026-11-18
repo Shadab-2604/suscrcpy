@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.0.0] - 2026-11-18
 
+### Critical Fixes & UI/UX Audit
+- **Android Display Ratio Synchronization**: Fixed critical defect where changing screen resolution on Android did not update the embedded scrcpy screen inside SUSCRCPY.
+- **Responsive ViewportCanvas**: Re-architected embedded scrcpy container to calculate strict letterboxing and pillarboxing, eliminating stretching, distortion, or cropping.
+- **Dynamic Resize Recalculation**: Container geometry automatically re-fits on window resize, maximize, restore, pane splitter drag, and device rotation.
+- **Real-Time Stream Sniffing**: Integrated real-time reader thread capturing `INFO: Texture: WxH` and frame rate (`fps`) directly from scrcpy stream output.
+- **Tri-Point Synchronization HUD**: Added bottom status bar displaying:
+  - `📱 Android Logical: WxH px`
+  - `📺 scrcpy Stream: WxH px`
+  - `🖥 SUSCRCPY Preview: WxH px (Ratio)`
+  - Real-time synchronization status pill (`● Synchronized` vs `⚠️ Mismatch`)
+  - Quick action buttons for `↻ Re-Sync` and `↺ Reset`.
+- **All 19 Standardized Aspect Ratio Presets**: Full support for `1:1`, `3:2`, `4:3`, `5:4`, `9:16`, `9:18`, `9:19`, `9:19.5`, `9:20`, `9:21`, `9:22`, `16:9`, `16:10`, `18:9`, `19:9`, `19.5:9`, `20:9`, `21:9`, `32:9`.
+- **8-Step Synchronization Workflow**: Implemented Step 1-8 workflow with Step 4 `wm size` verification and complete preservation of testing sessions, logs, app context, and quality profiles.
+
 ### Added
 - **Testing Session Manager**:
   - Full session lifecycle (`Created`, `Running`, `Paused`, `Completed`, `Interrupted`).
