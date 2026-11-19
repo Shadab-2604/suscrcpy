@@ -12,7 +12,7 @@ from typing import Optional
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from platform.base import BaseWindowEmbedder
+from display_backend.base import BaseWindowEmbedder
 
 logger = logging.getLogger("suscrcpy.platform.windows")
 

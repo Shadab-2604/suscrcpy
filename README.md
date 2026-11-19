@@ -4,9 +4,9 @@
 [![Platform: Linux](https://img.shields.io/badge/Platform-Linux%20%7C%20Kali%20%7C%20Debian%20%7C%20Ubuntu-orange.svg)](#requirements)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](#requirements)
 
-**SUSCRCPY** is an open-source, cross-platform Android Device Testing Desktop Application designed for application developers, QA engineers, and cybersecurity security researchers. 
+**SUSCRCPY** is a focused, open-source Android testing desktop application for developers, QA engineers and security researchers.
 
-It combines **low-latency interactive screen mirroring** (powered by `scrcpy`), **native foreign window embedding**, **display aspect ratio and resolution overrides**, **installed application package management**, and **real-time logcat monitoring with crash detection** into a single desktop utility.
+It combines **low-latency interactive screen mirroring** (powered by `scrcpy`), **native window embedding**, **exact display aspect-ratio and resolution overrides**, and **real-time logcat monitoring with crash detection** in one small window: the live device screen on the left, three work tabs on the right.
 
 ---
 
@@ -33,34 +33,37 @@ It combines **low-latency interactive screen mirroring** (powered by `scrcpy`), 
 ## Key Features
 
 1. **Embedded scrcpy Screen Mirroring**:
-   - The interactive Android screen is embedded natively into the main SUSCRCPY application window using native OS window adoption (`QWindow.fromWinId`).
-   - Direct mouse control, touch simulation, swipe gestures, text input, and Android navigation.
-   - Smooth letterboxed scaling preserving the target aspect ratio without visual distortion.
+   - The interactive Android screen is embedded natively into the left pane of the window (`QWindow.fromWinId`).
+   - The mirror is left-anchored and fully visible for every aspect ratio; it never jumps centre or clips.
+   - Direct mouse control, touch simulation, swipe gestures, text input and Android navigation.
+   - `Fit` (whole screen), `Fill` (crop) and `Original` (1:1) scaling modes.
 
-2. **Display Resolution & Aspect Ratio Management**:
-   - Preset ratios: `1:1`, `4:3`, `5:4`, `16:9`, `16:10`, `18:9`, `19.5:9`, `20:9`, and `Custom (pixels)`.
-   - Dynamic dimension linkage: changing Width updates Height according to the selected ratio.
-   - Live greatest common divisor (GCD) aspect ratio computation.
-   - Instant resolution overrides via `wm size` and clean restoration to native physical hardware resolution via `wm size reset`.
-   - Universal Screen Profiles Library featuring 12 device categories (phones, tablets, foldables, smartwatches, monitors, TVs, XR, etc.).
+2. **Exact Display Resolution & Aspect Ratio Override**:
+   - 20 presets: `1:1`, `3:2`, `4:3`, `5:4`, `16:9`, `16:10`, `18:9`, `19:9`, `19.5:9`, `20:9`, `21:9`, `22:9`, `32:9` and their portrait forms, plus `Custom` pixels.
+   - Sizes are snapped to integer multiples of the ratio, so the applied resolution reduces to exactly the requested ratio (no off-by-one distortion).
+   - Width and height fields stay linked to the selected ratio, in the device's current orientation.
+   - Every applied size is verified by reading `wm size` back from the device.
+   - The native resolution is restored automatically on exit or with **Reset**.
 
-3. **Installed Application Discovery**:
-   - Enumerates third-party user applications and core system packages via ADB.
-   - Package search, category filtering (`All`, `User Apps`, `System Apps`), and metadata inspection.
-   - One-click target binding for application-specific log filtering.
+3. **Installed Application Selector**:
+   - Lists user and system packages with search and filters.
+   - Selecting an app narrows logcat to that application's processes.
 
 4. **Real-Time Android Logcat Monitoring**:
-   - Background streaming worker with bounded GUI memory buffer (prevents freezing on high log volume).
+   - Background streaming worker with a bounded view buffer (3000 lines) and a capped export buffer.
    - Real-time severity classification (Verbose, Debug, Info, Warning, Error, Fatal).
-   - Pattern-based crash and error detection (`FATAL EXCEPTION`, `ANR`, `AndroidRuntime`, `NullPointerException`, etc.).
-   - Full device logging vs application-specific logging.
-   - Search filtering, live counters, hardware buffer clearing (`adb logcat -c`), and timestamped diagnostic report export.
+   - Confirmed-crash detection (`FATAL EXCEPTION`, ANR, `AndroidRuntime`, `Fatal signal`).
+   - Counters are exact: errors are ERROR/FATAL lines, warnings are W lines, and crashes
+     count events (stack frames are grouped, not counted again).
+   - Category filters (All / Errors / Warnings / Crashes) re-filter retained lines instantly.
+   - Reset counters without losing captured logs, and export all logs or a single category.
+   - Full-device or per-application logging, text filter, pause and auto-scroll.
 
-5. **Integrated Automatic GitHub Updates**:
-   - Single-command automated updates (`sudo suscrcpy --update`).
-   - In-app GUI release checker with non-blocking background workers.
-   - Cryptographic SHA-256 integrity verification (`SHA256SUMS`).
-   - Zip Slip / path traversal protection, atomic staging, and automated rollback if self-test verification fails.
+5. **Screenshot Capture**:
+   - One click (or `Ctrl+Shift+S`) saves a PNG of the live device screen to `~/Pictures/SUSCRCPY` with verified pixel dimensions.
+
+6. **Automatic GitHub Updates (CLI)**:
+   - `sudo suscrcpy --update` with SHA-256 integrity verification, zip-slip protection, atomic staging and rollback.
 
 ---
 
@@ -135,6 +138,13 @@ suscrcpy
 
 Or search for **SUSCRCPY** in your desktop application menu under *Development* or *Utility*.
 
+### Window layout
+
+- **Left** — the live Android screen with a small toolbar (Screenshot, Scaling, Quality, Fullscreen) and a status strip showing device size, stream size, view size and sync state.
+- **Display** tab — aspect-ratio preset, width/height, Apply and Reset.
+- **Apps** tab — search and select the app to follow in the logs.
+- **Logs** tab — start/stop, pause, clear, reset counters, category filters and scoped export.
+
 ### CLI Reference
 
 | Command | Description |
@@ -174,12 +184,7 @@ During an update:
 5. Files are staged and the new version runs an automated self-test.
 6. If the self-test fails, the previous version is automatically restored.
 
-### Updating via GUI
-
-1. Click the **🔄 Updates** button in the header bar.
-2. The dialog will check GitHub in the background without freezing the interface.
-3. Review the release notes and version number.
-4. Click **Update Now** to apply the release.
+Updates are applied through the CLI so that the archive is verified and installed with the privileges under your control.
 
 ---
 
@@ -228,7 +233,8 @@ This removes `/opt/suscrcpy`, `/usr/local/bin/suscrcpy`, and the desktop launche
 - **Repository**: [https://github.com/Shadab-2604/suscrcpy](https://github.com/Shadab-2604/suscrcpy)
 - **Language**: Python 3.10+
 - **Framework**: PySide6 (Qt 6)
-- **Protocol**: Android Debug Bridge (ADB), scrcpy v1.x / v2.x / v4.x
+- **Modules**: `core/` (ADB, screen, scrcpy, logs, screenshots), `display_backend/` (native window embedding), `ui/` (window, panels)
+- **Protocol**: Android Debug Bridge (ADB), scrcpy v2.x / v4.x
 - **Update Verification**: SHA-256 checksum validation via `SHA256SUMS`
 
 ---

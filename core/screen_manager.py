@@ -1,37 +1,27 @@
-"""Display ratio, resolution calculations, and override restoration for SUSCRCPY.
+"""Display resolution and aspect-ratio control for SUSCRCPY.
 
-Implements aspect ratio calculations, pixel bounds validation, and safe
-original display size restoration on exit.
+Applies logical resolution overrides through ``adb shell wm size``, verifies that
+Android actually accepted the requested size, and guarantees that every override
+is restored to the device's original state on exit.
 """
 from __future__ import annotations
 
 import logging
 import math
+import time
 from typing import Dict, Optional, Tuple
 
 from core.adb_manager import AdbError, AdbManager
 
 logger = logging.getLogger("suscrcpy.screen_manager")
 
-# Presets mapping label to (ratio_width, ratio_height)
-# Supports all 19 standardized aspect ratio presets (both portrait and landscape equivalents)
+# Canonical presets. Each entry is a *shape*: the long-edge factor comes first.
 ASPECT_RATIOS: Dict[str, Tuple[int, int]] = {
-    # 1:1 Neutral Square
     "1:1": (1, 1),
-    # Common Standards
     "3:2": (3, 2),
     "4:3": (4, 3),
     "5:4": (5, 4),
     "16:10": (16, 10),
-    # Portrait equivalents (Standard & Modern smartphones)
-    "9:16": (9, 16),
-    "9:18": (9, 18),
-    "9:19": (9, 19),
-    "9:19.5": (18, 39),
-    "9:20": (9, 20),
-    "9:21": (9, 21),
-    "9:22": (9, 22),
-    # Landscape equivalents (Monitors, handhelds, widescreen & ultrawide)
     "16:9": (16, 9),
     "18:9": (18, 9),
     "19:9": (19, 9),
@@ -40,32 +30,91 @@ ASPECT_RATIOS: Dict[str, Tuple[int, int]] = {
     "21:9": (21, 9),
     "22:9": (22, 9),
     "32:9": (32, 9),
+    "9:16": (16, 9),
+    "9:18": (18, 9),
+    "9:19": (19, 9),
+    "9:19.5": (39, 18),
+    "9:20": (20, 9),
+    "9:21": (21, 9),
+    "9:22": (22, 9),
 }
 
+# Preset order used by the UI (portrait shapes first, then landscape/desktop shapes).
+PRESET_ORDER = [
+    "9:16", "9:18", "9:19", "9:19.5", "9:20", "9:21", "9:22",
+    "1:1", "3:2", "4:3", "5:4", "16:9", "16:10",
+    "18:9", "19:9", "19.5:9", "20:9", "21:9", "22:9", "32:9",
+]
+
 RESOLUTION_NOTICE = (
-    "Notice: Applying a resolution modifies Android's logical display settings via "
-    "'wm size'. This adjusts UI layout and rendering on the actual Android device, "
-    "not merely the window preview. Native resolution will be restored upon clean exit "
-    "or by pressing 'Reset Resolution'."
+    "Applying a resolution changes the device's logical display through 'wm size'. "
+    "The native size is restored automatically on exit or with Reset."
 )
+
+# Preferred label for a fully reduced (long, short) shape: portrait, landscape.
+_SHAPE_LABELS = {
+    (1, 1): ("1:1", "1:1"),
+    (3, 2): ("2:3", "3:2"),
+    (4, 3): ("3:4", "4:3"),
+    (5, 4): ("4:5", "5:4"),
+    (8, 5): ("5:8", "16:10"),
+    (16, 9): ("9:16", "16:9"),
+    (2, 1): ("9:18", "18:9"),
+    (19, 9): ("9:19", "19:9"),
+    (13, 6): ("9:19.5", "19.5:9"),
+    (20, 9): ("9:20", "20:9"),
+    (21, 9): ("9:21", "21:9"),
+    (22, 9): ("9:22", "22:9"),
+    (32, 9): ("9:32", "32:9"),
+}
 
 
 class ScreenManager:
-    """Manages display ratio presets, custom pixel validation, and wm size lifecycle."""
+    """Owns display ratio math and the ``wm size`` override lifecycle."""
 
     def __init__(self, adb_manager: AdbManager) -> None:
         self.adb = adb_manager
-        # Mapping from serial to original override (None if native physical)
         self._original_overrides: Dict[str, Optional[Tuple[int, int]]] = {}
         self._modified_devices: set[str] = set()
 
-    def record_initial_resolution(self, serial: str) -> Tuple[Tuple[int, int], Optional[Tuple[int, int]]]:
-        """Record the device's initial physical and override resolution before any modifications."""
+    # ------------------------------------------------------------------ state
+    def record_initial_resolution(
+        self, serial: str
+    ) -> Tuple[Tuple[int, int], Optional[Tuple[int, int]]]:
+        """Remember the device's physical size and pre-existing override once."""
         phys_res, override_res = self.adb.get_display_size(serial)
         if serial not in self._original_overrides:
             self._original_overrides[serial] = override_res
-            logger.info("Recorded initial resolution for %s: physical=%s, override=%s", serial, phys_res, override_res)
+            logger.info(
+                "Recorded initial resolution for %s: physical=%s override=%s",
+                serial, phys_res, override_res,
+            )
         return phys_res, override_res
+
+    def get_active_size(self, serial: str) -> Tuple[Tuple[int, int], Optional[Tuple[int, int]]]:
+        """Return (physical, override) exactly as reported by the device."""
+        return self.adb.get_display_size(serial)
+
+    # ---------------------------------------------------------------- ratios
+    @staticmethod
+    def calculate_aspect_ratio(width_px: int, height_px: int) -> Tuple[int, int]:
+        """Reduce pixel dimensions to the smallest exact integer ratio."""
+        if width_px <= 0 or height_px <= 0:
+            return 1, 1
+        divisor = math.gcd(width_px, height_px)
+        return width_px // divisor, height_px // divisor
+
+    @staticmethod
+    def ratio_label(width_px: int, height_px: int) -> str:
+        """Exact ratio label using preset notation where one applies (e.g. ``9:16``)."""
+        rw, rh = ScreenManager.calculate_aspect_ratio(width_px, height_px)
+        portrait = height_px >= width_px
+        long_side, short_side = max(rw, rh), min(rw, rh)
+        divisor = math.gcd(long_side, short_side)
+        labels = _SHAPE_LABELS.get((long_side // divisor, short_side // divisor))
+        if labels:
+            return labels[0] if portrait else labels[1]
+        return f"{rw}:{rh}"
 
     def calculate_dimensions_for_ratio(
         self,
@@ -73,57 +122,48 @@ class ScreenManager:
         current_h: int,
         ratio_name: str,
     ) -> Tuple[int, int]:
-        """Compute new width and height while strictly preserving device orientation (portrait vs landscape)."""
+        """Return pixel dimensions matching ``ratio_name`` in the current orientation.
+
+        The long edge of the current display is preserved so the device keeps its
+        native scale; only the short edge is recalculated.
+        """
         if ratio_name not in ASPECT_RATIOS:
             raise ValueError(f"Unknown aspect ratio preset: '{ratio_name}'")
 
-        r1, r2 = ASPECT_RATIOS[ratio_name]
-        is_portrait = current_h >= current_w
+        long_factor, short_factor = ASPECT_RATIOS[ratio_name]
+        long_edge = max(current_w, current_h)
 
-        major = max(r1, r2)
-        minor = min(r1, r2)
+        # Snap to an integer multiple of the ratio so the resulting size reduces to
+        # exactly the requested ratio instead of being off by a rounding pixel.
+        multiple = max(1, long_edge // long_factor)
+        long_px = multiple * long_factor
+        short_px = multiple * short_factor
 
-        if is_portrait:
-            # Portrait: Height is the long edge (major factor), Width is the short edge (minor factor)
-            long_edge = max(current_w, current_h)
-            new_h = long_edge
-            new_w = round(long_edge * minor / major)
-        else:
-            # Landscape: Width is the long edge (major factor), Height is the short edge (minor factor)
-            long_edge = max(current_w, current_h)
-            new_w = long_edge
-            new_h = round(long_edge * minor / major)
+        if current_h >= current_w:  # portrait
+            new_w, new_h = short_px, long_px
+        else:                        # landscape
+            new_w, new_h = long_px, short_px
 
-        self.validate_pixels(new_w, new_h)
-        return new_w, new_h
+        return self.validate_pixels(new_w, new_h)
 
     @staticmethod
-    def calculate_aspect_ratio(width_px: int, height_px: int) -> Tuple[int, int]:
-        """Calculate simplified aspect ratio using Greatest Common Divisor (GCD)."""
-        if width_px <= 0 or height_px <= 0:
-            return 1, 1
-        gcd = math.gcd(width_px, height_px)
-        return width_px // gcd, height_px // gcd
-
-    def validate_pixels(self, width: int, height: int) -> Tuple[int, int]:
-        """Ensure pixel dimensions are positive integers within the safe [100, 10000] range."""
+    def validate_pixels(width: int, height: int) -> Tuple[int, int]:
+        """Reject sizes that SurfaceFlinger cannot represent safely."""
         if not (isinstance(width, int) and isinstance(height, int)):
-            raise ValueError(f"Pixel dimensions must be integers. Received ({type(width)}, {type(height)}).")
-
+            raise ValueError("Pixel dimensions must be integers.")
         if not (100 <= width <= 10000 and 100 <= height <= 10000):
             raise ValueError(
-                f"Resolution {width}x{height} outside supported safety limits [100 - 10000 px]. "
-                "Values below 100 or above 10000 may cause Android SurfaceFlinger crashes."
+                f"Resolution {width}x{height} is outside the supported range "
+                "[100 - 10000 px]."
             )
         return width, height
 
-    def apply_resolution(self, serial: str, width: int, height: int, verify: bool = True) -> Tuple[int, int]:
-        """Apply a resolution override via ADB 'wm size' and verify actual application on device.
-
-        Returns verified (override_w, override_h) tuple.
-        """
+    # ---------------------------------------------------------------- apply
+    def apply_resolution(
+        self, serial: str, width: int, height: int, verify: bool = True
+    ) -> Tuple[int, int]:
+        """Apply ``width x height`` via ``wm size`` and return what the device reports."""
         self.validate_pixels(width, height)
-        # Ensure we recorded initial state before first modification
         if serial not in self._original_overrides:
             self.record_initial_resolution(serial)
 
@@ -131,51 +171,43 @@ class ScreenManager:
         self.adb.set_display_size(serial, width, height)
         self._modified_devices.add(serial)
 
-        if verify:
-            # Step 4 verification: SurfaceFlinger applies wm size asynchronously
-            import time
-            time.sleep(0.12)
-            _, override_res = self.adb.get_display_size(serial)
-            retries = 3
-            while override_res != (width, height) and retries > 0:
-                time.sleep(0.15)
-                _, override_res = self.adb.get_display_size(serial)
-                retries -= 1
+        if not verify:
+            return width, height
 
-            if override_res != (width, height):
-                logger.warning(
-                    "Resolution verification warning on %s: requested %dx%d but device reports override=%s",
-                    serial, width, height, override_res
-                )
-            return override_res or (width, height)
-        return width, height
+        requested = (width, height)
+        _, override = self.adb.get_display_size(serial)
+        for _ in range(5):
+            if override == requested:
+                break
+            time.sleep(0.15)
+            _, override = self.adb.get_display_size(serial)
+
+        if override != requested:
+            logger.warning(
+                "Device %s accepted %dx%d but reports override=%s",
+                serial, width, height, override,
+            )
+        return override or requested
 
     def reset_resolution(self, serial: str) -> Tuple[int, int]:
-        """Reset the display resolution override on the device."""
-        import time
-        logger.info("Resetting resolution on device %s", serial)
+        """Clear the override and return the native physical resolution."""
+        logger.info("Resetting display resolution on %s", serial)
         self.adb.reset_display_size(serial)
         self._modified_devices.discard(serial)
-        time.sleep(0.12)
         phys_res, _ = self.adb.get_display_size(serial)
         return phys_res
 
-    def restore_device(self, serial: str) -> None:
-        """Restore initial resolution on the specified device."""
-        self.reset_resolution(serial)
-
     def restore_all(self) -> None:
-        """Clean-up handler: safely restores initial state on all modified devices upon application exit."""
+        """Restore every device this session modified back to its original state."""
         for serial in list(self._modified_devices):
             try:
-                orig_override = self._original_overrides.get(serial)
-                if orig_override is not None:
-                    ow, oh = orig_override
-                    logger.info("Restoring original override %dx%d on %s", ow, oh, serial)
-                    self.adb.set_display_size(serial, ow, oh)
+                original = self._original_overrides.get(serial)
+                if original:
+                    self.adb.set_display_size(serial, original[0], original[1])
+                    logger.info("Restored original override %dx%d on %s", *original, serial)
                 else:
-                    logger.info("Restoring native physical size on %s", serial)
                     self.adb.reset_display_size(serial)
-            except Exception as e:
-                logger.error("Failed to restore display size for %s: %s", serial, e)
+                    logger.info("Restored native size on %s", serial)
+            except (AdbError, Exception) as exc:  # noqa: BLE001 - never block shutdown
+                logger.error("Failed to restore display size for %s: %s", serial, exc)
         self._modified_devices.clear()

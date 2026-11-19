@@ -55,6 +55,29 @@ class TestRatioCalculations(unittest.TestCase):
         self.assertEqual(w, 1920)
         self.assertEqual(h, 1440)
 
+    def test_every_preset_snaps_to_exact_ratio(self):
+        """Applied sizes must reduce to exactly the requested ratio, not one pixel off."""
+        import math
+
+        for preset, (long_factor, short_factor) in ASPECT_RATIOS.items():
+            for width, height in ((800, 1280), (1280, 800)):
+                new_w, new_h = self.sm.calculate_dimensions_for_ratio(width, height, preset)
+                divisor = math.gcd(new_w, new_h)
+                reduced = (max(new_w // divisor, new_h // divisor),
+                           min(new_w // divisor, new_h // divisor))
+                expected = math.gcd(long_factor, short_factor)
+                expected_ratio = (long_factor // expected, short_factor // expected)
+                self.assertEqual(
+                    reduced, expected_ratio,
+                    f"{preset} from {width}x{height} produced {new_w}x{new_h}",
+                )
+
+    def test_ratio_label_uses_preset_notation(self):
+        self.assertEqual(ScreenManager.ratio_label(576, 1248), "9:19.5")
+        self.assertEqual(ScreenManager.ratio_label(1080, 1920), "9:16")
+        self.assertEqual(ScreenManager.ratio_label(1920, 1080), "16:9")
+        self.assertEqual(ScreenManager.ratio_label(800, 1280), "5:8")
+
     def test_pixel_bounds_validation(self):
         # Valid pixels
         w, h = self.sm.validate_pixels(720, 1280)
@@ -77,7 +100,7 @@ class TestRatioCalculations(unittest.TestCase):
         self.assertIn(("set", serial, 720, 1280), self.adb.calls)
 
         # Restore
-        self.sm.restore_device(serial)
+        self.sm.reset_resolution(serial)
         self.assertIn(("reset", serial), self.adb.calls)
 
 

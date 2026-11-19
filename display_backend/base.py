@@ -25,6 +25,13 @@ class BaseWindowEmbedder(abc.ABC):
         """Find the native window identifier (HWND or X11 WId) for the given title/PID."""
         pass
 
+    def is_window_ready(self, window_id: int) -> bool:
+        """Whether the native window is shown and safe to reparent.
+
+        Reparenting a window its owner has not shown yet can crash the owner.
+        """
+        return True
+
     @abc.abstractmethod
     def embed_window(
         self,

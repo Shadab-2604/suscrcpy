@@ -76,7 +76,7 @@ echo "[4/5] Deploying application files to $TARGET_DIR..."
 mkdir -p "$TARGET_DIR"
 
 # Clean previous files while preserving any user logs or configs
-for item in core ui platform resources main.py version.py update_manager.py uninstall.sh requirements.txt LICENSE README.md; do
+for item in core ui display_backend resources main.py version.py update_manager.py uninstall.sh requirements.txt LICENSE README.md; do
     if [ -e "$SCRIPT_DIR/$item" ]; then
         rm -rf "${TARGET_DIR:?}/$item"
         cp -r "$SCRIPT_DIR/$item" "$TARGET_DIR/"

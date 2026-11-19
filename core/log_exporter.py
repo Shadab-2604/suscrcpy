@@ -42,6 +42,7 @@ class LogExporter:
         error_count: int = 0,
         warning_count: int = 0,
         crash_count: int = 0,
+        filter_label: Optional[str] = None,
     ) -> int:
         """Write all captured logs along with diagnostic header metadata.
 
@@ -68,13 +69,17 @@ class LogExporter:
             f"Errors Detected  : {error_count}",
             f"Warnings         : {warning_count}",
             f"Crashes/ANRs     : {crash_count}",
+        ]
+        if filter_label:
+            header_lines.append(f"Export Scope     : {filter_label} only")
+        header_lines.extend([
             "=" * 80,
             "SECURITY NOTICE:",
             "Device logs may contain sensitive information, tokens, authentication headers,",
             "PII, or internal endpoints. Handle and store this export securely.",
             "=" * 80,
             "",
-        ]
+        ])
 
         try:
             with open(filepath, "w", encoding="utf-8") as f:

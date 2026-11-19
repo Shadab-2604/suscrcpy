@@ -1,615 +1,549 @@
-"""Embedded Live Android Screen View for SUSCRCPY.
+"""Embedded live Android screen for SUSCRCPY.
 
-Hosts the embedded native scrcpy display window inside the left panel of the interface,
-handling responsive ViewportCanvas letterboxing/pillarboxing with mathematical contain/fill/original
-aspect ratio fitting, Sync HUD diagnostics, interaction forwarding, and graceful fallbacks.
+Hosts the scrcpy window inside the left pane, keeps it left-anchored and fully
+visible for every aspect ratio, and reports exact device / stream / view metrics.
 """
 from __future__ import annotations
 
 import logging
-import math
-from typing import Optional, Tuple
+import time
+from typing import Optional
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
+from core.screen_manager import ScreenManager
 from core.scrcpy_manager import ScrcpyManager
-from platform import get_window_embedder
-from platform.linux_wayland import WaylandHelper
+from display_backend import get_window_embedder
+from display_backend.linux_wayland import WaylandHelper
 
 logger = logging.getLogger("suscrcpy.ui.screen_view")
 
+CANVAS_PADDING = 8
+# Poll for the native window while scrcpy starts up. The window is never reparented
+# until the display server reports it as mapped/visible.
+EMBED_POLL_INTERVAL_MS = 120
+EMBED_READY_TIMEOUT_S = 60.0
+
+
+def ratio_text(width: int, height: int) -> str:
+    """Exact ratio label for a pair of pixel dimensions."""
+    if width <= 0 or height <= 0:
+        return "--"
+    return ScreenManager.ratio_label(width, height)
+
 
 class ViewportCanvas(QtWidgets.QWidget):
-    """Black canvas hosting the embedded scrcpy window with responsive letterbox/pillarbox fitting."""
+    """Black canvas that keeps the mirrored screen left-anchored and fully visible."""
 
-    geometry_updated = QtCore.Signal(int, int, str)  # preview_w, preview_h, ratio_str
+    geometry_updated = QtCore.Signal(int, int, float)  # view_w, view_h, scale
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
         self.setObjectName("viewportCanvas")
-        self.setStyleSheet("QWidget#viewportCanvas { background-color: #0A0A0A; }")
         self.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.Expanding,
         )
+        self.setMinimumSize(320, 320)
 
         self._embedded_container: Optional[QtWidgets.QWidget] = None
-        self._target_w = 800
-        self._target_h = 1280
-        self._mode = "fit"  # "fit", "fill", or "original"
+        self._target_w = 0
+        self._target_h = 0
+        self._mode = "fit"
 
-        # Debounced resize timer for butter-smooth splitter and window resizing
         self._resize_timer = QtCore.QTimer(self)
         self._resize_timer.setSingleShot(True)
         self._resize_timer.setInterval(10)
-        self._resize_timer.timeout.connect(self._do_recalculate_geometry)
+        self._resize_timer.timeout.connect(self._recalculate)
 
-        # Centered placeholder frame when no scrcpy container is attached
-        self.placeholder_layout = QtWidgets.QVBoxLayout(self)
-        self.placeholder_layout.setContentsMargins(20, 20, 20, 20)
-        self.placeholder_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self._build_placeholder()
 
-        self.placeholder = QtWidgets.QFrame(self)
-        self.placeholder.setStyleSheet(
-            "QFrame { background-color: #12141A; border: 1px solid #232733; border-radius: 6px; padding: 16px; }"
-        )
-        pl_layout = QtWidgets.QVBoxLayout(self.placeholder)
-        pl_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        pl_layout.setSpacing(8)
+    # ------------------------------------------------------------------ ui
+    def _build_placeholder(self) -> None:
+        self._placeholder = QtWidgets.QFrame(self)
+        self._placeholder.setObjectName("viewportPlaceholder")
+        layout = QtWidgets.QVBoxLayout(self._placeholder)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(6)
+        layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
 
-        self.status_title = QtWidgets.QLabel("No Active Display Mirror")
-        self.status_title.setStyleSheet("font-size: 13px; font-weight: 600; color: #EEEEEE;")
+        self.status_title = QtWidgets.QLabel("No device mirror")
+        self.status_title.setObjectName("placeholderTitle")
         self.status_title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        pl_layout.addWidget(self.status_title)
 
         self.status_desc = QtWidgets.QLabel(
-            "Connect an Android device with USB Debugging enabled.\n"
-            "The live interactive screen will be embedded here."
+            "Connect an Android device with USB debugging enabled."
         )
-        self.status_desc.setStyleSheet("color: #7E8B9B; font-size: 11px; line-height: 1.4;")
+        self.status_desc.setObjectName("placeholderText")
         self.status_desc.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        pl_layout.addWidget(self.status_desc)
+        self.status_desc.setWordWrap(True)
 
-        # Wayland Advisory Card
-        self.wayland_banner = QtWidgets.QFrame()
-        self.wayland_banner.setStyleSheet(
-            "QFrame { background-color: #1F1B12; border: 1px solid #634A1B; border-radius: 4px; padding: 8px; margin-top: 10px; }"
-        )
-        wb_layout = QtWidgets.QVBoxLayout(self.wayland_banner)
-        wb_title = QtWidgets.QLabel("Wayland Display Notice")
-        wb_title.setStyleSheet("font-weight: 600; color: #EAB308; font-size: 11px;")
-        self.wb_text = QtWidgets.QLabel("")
-        self.wb_text.setStyleSheet("color: #D1D5DB; font-size: 11px;")
-        self.wb_text.setWordWrap(True)
-        wb_layout.addWidget(wb_title)
-        wb_layout.addWidget(self.wb_text)
+        layout.addWidget(self.status_title)
+        layout.addWidget(self.status_desc)
+
+        self.wayland_banner = QtWidgets.QLabel("")
+        self.wayland_banner.setObjectName("waylandBanner")
+        self.wayland_banner.setWordWrap(True)
         self.wayland_banner.setVisible(False)
-        pl_layout.addWidget(self.wayland_banner)
+        layout.addWidget(self.wayland_banner)
 
-        # Temporary Updating Display Overlay Badge
-        self.updating_badge = QtWidgets.QFrame(self)
-        self.updating_badge.setStyleSheet(
-            "QFrame { background-color: rgba(18, 22, 31, 0.92); border: 1px solid #3B82F6; border-radius: 6px; padding: 8px 16px; }"
-        )
-        ub_layout = QtWidgets.QHBoxLayout(self.updating_badge)
-        ub_layout.setContentsMargins(10, 6, 10, 6)
-        ub_layout.setSpacing(8)
-        self.ub_label = QtWidgets.QLabel("⟳ Updating display... Synchronizing stream")
-        self.ub_label.setStyleSheet("color: #60A5FA; font-weight: 600; font-size: 12px;")
-        ub_layout.addWidget(self.ub_label)
+        self.updating_badge = QtWidgets.QLabel("Applying display change...")
+        self.updating_badge.setObjectName("updatingBadge")
         self.updating_badge.setVisible(False)
+        layout.addWidget(self.updating_badge)
 
-        self.placeholder_layout.addWidget(self.placeholder)
-
+    # -------------------------------------------------------------- attach
     def attach_container(self, container: QtWidgets.QWidget) -> None:
-        """Reparent and anchor external scrcpy container inside canvas."""
-        self.placeholder.setVisible(False)
+        self._placeholder.setVisible(False)
         self._embedded_container = container
         container.setParent(self)
-        container.setVisible(True)
-        self._do_recalculate_geometry()
         container.show()
         container.setFocus()
+        self._recalculate()
 
     def detach_container(self) -> None:
-        """Remove scrcpy container and restore placeholder."""
-        if self._embedded_container:
+        if self._embedded_container is not None:
             self._embedded_container.setParent(None)
             self._embedded_container.deleteLater()
             self._embedded_container = None
-        self.placeholder.setVisible(True)
+        self._placeholder.setVisible(True)
+        self._recalculate()
+        self.geometry_updated.emit(0, 0, 0.0)
 
+    def has_stream(self) -> bool:
+        return self._embedded_container is not None
+
+    # ------------------------------------------------------------- geometry
     def set_target_dimensions(self, width: int, height: int) -> None:
-        """Update stream/logical aspect ratio target and re-fit."""
         if width > 0 and height > 0:
             self._target_w = width
             self._target_h = height
-            self.recalculate_geometry()
+            self._schedule()
 
     def set_display_mode(self, mode: str) -> None:
-        """Set scaling mode ('fit', 'fill', or 'original')."""
-        self._mode = mode.lower()
-        self.recalculate_geometry()
+        self._mode = mode
+        self._schedule()
 
-    def show_updating_overlay(self, show: bool = True, text: str = "⟳ Updating display...") -> None:
-        """Display temporary status indicator during resolution changes."""
-        self.ub_label.setText(text)
+    def show_updating_overlay(self, show: bool, text: str = "") -> None:
+        if text:
+            self.updating_badge.setText(text)
         self.updating_badge.setVisible(show)
-        if show:
-            self.updating_badge.raise_()
-            self._position_overlay()
 
-    def _position_overlay(self) -> None:
-        if self.updating_badge.isVisible():
-            bw = self.updating_badge.sizeHint().width()
-            bh = self.updating_badge.sizeHint().height()
-            bx = (self.width() - bw) // 2
-            by = (self.height() - bh) // 2
-            self.updating_badge.setGeometry(bx, by, bw, bh)
-
-    def calculate_fitted_geometry(
-        self,
-        avail_w: int,
-        avail_h: int,
-        target_w: int,
-        target_h: int,
-    ) -> QtCore.QRect:
-        """Calculate aspect-ratio-preserving rectangle using strict mathematical scaling.
-
-        Let CW = avail_w, CH = avail_h, SW = target_w, SH = target_h.
-        - FIT mode: scale = min(CW / SW, CH / SH)
-        - FILL mode: scale = max(CW / SW, CH / SH)
-        - ORIGINAL mode: scale = 1.0 (subject to available canvas bounds)
-        """
-        if avail_w <= 0 or avail_h <= 0 or target_w <= 0 or target_h <= 0:
-            return QtCore.QRect(0, 0, max(1, avail_w), max(1, avail_h))
-
-        cw, ch = float(avail_w), float(avail_h)
-        sw, sh = float(target_w), float(target_h)
-
-        if self._mode == "original":
-            # 1:1 pixel mapping: render at actual source dimensions
-            rendered_w = int(round(sw))
-            rendered_h = int(round(sh))
-            x = (avail_w - rendered_w) // 2
-            y = (avail_h - rendered_h) // 2
-            return QtCore.QRect(x, y, rendered_w, rendered_h)
-
-        if self._mode == "fill":
-            # FILL mode: scale = max(CW / SW, CH / SH) -> fills entire container, cropping excess
-            scale = max(cw / sw, ch / sh)
-            rendered_w = max(1, int(round(sw * scale)))
-            rendered_h = max(1, int(round(sh * scale)))
-            x = (avail_w - rendered_w) // 2
-            y = (avail_h - rendered_h) // 2
-            return QtCore.QRect(x, y, rendered_w, rendered_h)
-
-        # FIT mode (default): scale = min(CW / SW, CH / SH) -> complete screen visible, letterbox/pillarbox
-        scale = min(cw / sw, ch / sh)
-        rendered_w = max(1, int(round(sw * scale)))
-        rendered_h = max(1, int(round(sh * scale)))
-        x = (avail_w - rendered_w) // 2
-        y = (avail_h - rendered_h) // 2
-        return QtCore.QRect(x, y, rendered_w, rendered_h)
-
-    def recalculate_geometry(self) -> None:
-        """Schedule lightweight geometry recalculation via debounce timer."""
+    def _schedule(self) -> None:
         self._resize_timer.start(10)
 
-    def _do_recalculate_geometry(self) -> None:
-        """Execute contain/fill geometry fitting on child window."""
-        self._position_overlay()
-        if not self._embedded_container:
+    def _recalculate(self) -> None:
+        if self._embedded_container is not None and self._target_w > 0:
+            rect, scale = self.fitted_rect()
+            self._embedded_container.setGeometry(rect)
+            self.geometry_updated.emit(rect.width(), rect.height(), scale)
+        self._position_placeholder()
+
+    def fitted_rect(self) -> tuple[QtCore.QRect, float]:
+        """Compute the on-screen rect: left-anchored, vertically centred, never clipped."""
+        available_w = max(1, self.width() - 2 * CANVAS_PADDING)
+        available_h = max(1, self.height() - 2 * CANVAS_PADDING)
+        ratio = self._target_w / self._target_h if self._target_h else 1.0
+
+        if self._mode == "original":
+            scale = min(1.0, available_w / self._target_w, available_h / self._target_h)
+            view_w = max(1, int(round(self._target_w * scale)))
+            view_h = max(1, int(round(self._target_h * scale)))
+        elif self._mode == "fill":
+            scale = max(available_w / self._target_w, available_h / self._target_h)
+            view_w = int(round(self._target_w * scale))
+            view_h = int(round(self._target_h * scale))
+        else:  # fit: whole screen visible
+            scale = min(available_w / self._target_w, available_h / self._target_h)
+            view_w = max(1, int(round(self._target_w * scale)))
+            view_h = max(1, int(round(self._target_h * scale)))
+
+        # Keep the requested aspect ratio exact after rounding, shrinking a pixel at a
+        # time if rounding pushed the mirror past the canvas edge.
+        view_h = max(1, int(round(view_w / ratio)))
+        if self._mode != "fill":
+            while (view_w > available_w or view_h > available_h) and view_w > 1:
+                view_w -= 1
+                view_h = max(1, int(round(view_w / ratio)))
+
+        x = CANVAS_PADDING                     # left-anchored on every ratio
+        y = CANVAS_PADDING + (available_h - view_h) // 2
+        if view_h <= available_h:
+            y = max(CANVAS_PADDING, y)
+        return QtCore.QRect(x, y, view_w, view_h), scale
+
+    def _position_placeholder(self) -> None:
+        if self.has_stream():
+            self._placeholder.setVisible(False)
             return
-
-        rect = self.calculate_fitted_geometry(
-            self.width(),
-            self.height(),
-            self._target_w,
-            self._target_h,
+        self._placeholder.setVisible(True)
+        width = min(max(300, self.width() - 80), 460)
+        self._placeholder.setFixedWidth(width)
+        self._placeholder.adjustSize()
+        self._placeholder.move(
+            CANVAS_PADDING + 24,
+            max(CANVAS_PADDING, (self.height() - self._placeholder.height()) // 2),
         )
-        self._embedded_container.setGeometry(rect)
-
-        gcd = math.gcd(rect.width(), rect.height())
-        if gcd > 0:
-            ratio_str = f"{rect.width() // gcd}:{rect.height() // gcd}"
-        else:
-            ratio_str = "1:1"
-
-        self.geometry_updated.emit(rect.width(), rect.height(), ratio_str)
 
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
         super().resizeEvent(event)
-        self._do_recalculate_geometry()
+        self._recalculate()
 
 
-class SyncHUD(QtWidgets.QFrame):
-    """Status bar showing Android logical resolution, scrcpy stream, preview size, and sync status."""
+class SyncBar(QtWidgets.QFrame):
+    """Compact status strip: device size, stream size, view size and sync state."""
 
     resync_requested = QtCore.Signal()
     reset_resolution_requested = QtCore.Signal()
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
-        self.setStyleSheet(
-            "QFrame { background-color: #0E121A; border-top: 1px solid #1E2533; padding: 2px 6px; }"
-            "QLabel { font-size: 11px; color: #94A3B8; }"
-            "QPushButton { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 3px; background-color: #1E2533; color: #E2E8F0; border: 1px solid #2D3748; }"
-            "QPushButton:hover { background-color: #2D3748; color: #FFFFFF; }"
-        )
+        self.setObjectName("syncBar")
         self.setFixedHeight(30)
 
         layout = QtWidgets.QHBoxLayout(self)
-        layout.setContentsMargins(6, 2, 6, 2)
-        layout.setSpacing(8)
+        layout.setContentsMargins(10, 0, 8, 0)
+        layout.setSpacing(9)
 
-        # Android Logical Dimension Label
-        self.android_lbl = QtWidgets.QLabel("📱 Android: --")
-        self.android_lbl.setToolTip("Logical resolution reported by Android ('wm size')")
-        layout.addWidget(self.android_lbl)
+        self.device_lbl = QtWidgets.QLabel("Device --")
+        self.device_lbl.setToolTip("Logical resolution Android is currently rendering")
+        layout.addWidget(self.device_lbl)
 
-        # Scrcpy Stream Dimension Label
-        self.stream_lbl = QtWidgets.QLabel("📺 Stream: --")
-        self.stream_lbl.setToolTip("Active scrcpy video stream texture resolution")
+        self.stream_lbl = QtWidgets.QLabel("Stream --")
+        self.stream_lbl.setToolTip("Resolution of the decoded scrcpy video stream")
         layout.addWidget(self.stream_lbl)
 
-        # Preview Dimension & Ratio Label
-        self.preview_lbl = QtWidgets.QLabel("🖥 Preview: --")
-        self.preview_lbl.setToolTip("Calculated fitted geometry inside SUSCRCPY container")
-        layout.addWidget(self.preview_lbl)
+        self.view_lbl = QtWidgets.QLabel("View --")
+        self.view_lbl.setToolTip("Size of the mirror inside this window")
+        layout.addWidget(self.view_lbl)
 
-        # Active Display Mode Badge
-        self.mode_badge = QtWidgets.QLabel("[FIT]")
-        self.mode_badge.setStyleSheet("color: #38BDF8; font-weight: 600; font-size: 10px;")
-        layout.addWidget(self.mode_badge)
+        self.mode_lbl = QtWidgets.QLabel("FIT")
+        self.mode_lbl.setObjectName("modeBadge")
+        layout.addWidget(self.mode_lbl)
 
-        # Live FPS Counter
-        self.fps_lbl = QtWidgets.QLabel("")
-        self.fps_lbl.setStyleSheet("color: #38BDF8; font-weight: 600;")
-        layout.addWidget(self.fps_lbl)
+        layout.addStretch(1)
 
-        layout.addStretch()
+        self.sync_lbl = QtWidgets.QLabel("Idle")
+        self.sync_lbl.setObjectName("syncIdle")
+        layout.addWidget(self.sync_lbl)
 
-        # Synchronization Status Badge
-        self.sync_badge = QtWidgets.QLabel("● Idle")
-        self.sync_badge.setStyleSheet("font-weight: 600; color: #94A3B8; margin-right: 4px;")
-        layout.addWidget(self.sync_badge)
-
-        # Quick Re-Sync Button
-        self.resync_btn = QtWidgets.QPushButton("↻ Re-Sync")
-        self.resync_btn.setToolTip("Re-query Android dimensions and refresh mirroring stream")
+        self.resync_btn = QtWidgets.QPushButton("Re-sync")
+        self.resync_btn.setObjectName("ghostBtn")
+        self.resync_btn.setToolTip("Re-read the device resolution and restart the stream")
         self.resync_btn.clicked.connect(self.resync_requested)
         layout.addWidget(self.resync_btn)
 
-        # Quick Reset Button
-        self.reset_btn = QtWidgets.QPushButton("↺ Reset")
-        self.reset_btn.setToolTip("Reset Android display override to hardware native physical size")
-        self.reset_btn.clicked.connect(self.reset_resolution_requested)
-        layout.addWidget(self.reset_btn)
-
 
 class ScreenView(QtWidgets.QWidget):
-    """Left-side container hosting the live embedded scrcpy screen, testing toolbar, and Sync HUD."""
+    """Left pane: mirror toolbar, live screen canvas and sync bar."""
 
-    embedding_failed = QtCore.Signal(str)
     screenshot_requested = QtCore.Signal()
-    recording_toggle_requested = QtCore.Signal()
-    quick_note_requested = QtCore.Signal()
+    mode_changed = QtCore.Signal(str)
     quality_changed = QtCore.Signal(str)
     fullscreen_toggled = QtCore.Signal(bool)
     resync_requested = QtCore.Signal()
     reset_resolution_requested = QtCore.Signal()
 
-    def __init__(
-        self,
-        scrcpy_manager: ScrcpyManager,
-        parent: Optional[QtWidgets.QWidget] = None,
-    ) -> None:
+    def __init__(self, scrcpy_manager: ScrcpyManager, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
         self.scrcpy_mgr = scrcpy_manager
         self._embedder = get_window_embedder()
         self._window_id: Optional[int] = None
-
+        self._pending_title: Optional[str] = None
+        self._pending_pid: Optional[int] = None
+        self._poll_attempts = 0
+        self._embed_deadline = 0.0
+        self._embed_abandoned = False
         self._android_w = 0
         self._android_h = 0
         self._stream_w = 0
         self._stream_h = 0
-        self._preview_w = 0
-        self._preview_h = 0
-        self._preview_ratio = ""
-        self._active_mode_str = "fit"
+        self._is_fullscreen = False
 
         self._poll_timer = QtCore.QTimer(self)
-        self._poll_timer.setInterval(80)
+        self._poll_timer.setInterval(EMBED_POLL_INTERVAL_MS)
         self._poll_timer.timeout.connect(self._check_and_embed)
-        self._pending_title: Optional[str] = None
-        self._pending_pid: Optional[int] = None
-        self._poll_attempts = 0
-        self._is_fullscreen = False
 
         self._build_ui()
         self._connect_signals()
 
+    # ------------------------------------------------------------------ ui
     def _build_ui(self) -> None:
-        self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
-        self.main_layout.setSpacing(0)
+        root = QtWidgets.QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
-        # 1. Quick Testing Toolbar (Top)
-        self.toolbar = QtWidgets.QFrame()
-        self.toolbar.setStyleSheet("QFrame { background-color: #12161F; border-bottom: 1px solid #1E2533; padding: 4px; }")
-        tb_layout = QtWidgets.QHBoxLayout(self.toolbar)
-        tb_layout.setContentsMargins(8, 4, 8, 4)
-        tb_layout.setSpacing(6)
+        toolbar = QtWidgets.QFrame()
+        toolbar.setObjectName("mirrorToolbar")
+        bar = QtWidgets.QHBoxLayout(toolbar)
+        bar.setContentsMargins(8, 6, 8, 6)
+        bar.setSpacing(8)
 
-        # Screenshot Button
-        self.shot_btn = QtWidgets.QPushButton("📸 Shot")
-        self.shot_btn.setToolTip("Capture Android Screen (Ctrl+Shift+S)")
-        self.shot_btn.setStyleSheet("padding: 3px 8px; font-size: 11px; font-weight: 600;")
+        self.shot_btn = QtWidgets.QPushButton("Screenshot")
+        self.shot_btn.setToolTip("Capture the device screen  (Ctrl+Shift+S)")
         self.shot_btn.setShortcut(QtGui.QKeySequence("Ctrl+Shift+S"))
         self.shot_btn.clicked.connect(self.screenshot_requested)
-        tb_layout.addWidget(self.shot_btn)
+        bar.addWidget(self.shot_btn)
 
-        # Recording Toggle Button
-        self.rec_btn = QtWidgets.QPushButton("⏺ Rec")
-        self.rec_btn.setToolTip("Start/Stop Device Screen Recording (Ctrl+Shift+R)")
-        self.rec_btn.setStyleSheet("padding: 3px 8px; font-size: 11px; font-weight: 600; color: #EF4444;")
-        self.rec_btn.setShortcut(QtGui.QKeySequence("Ctrl+Shift+R"))
-        self.rec_btn.clicked.connect(self.recording_toggle_requested)
-        tb_layout.addWidget(self.rec_btn)
+        bar.addSpacing(6)
 
-        self.rec_timer_lbl = QtWidgets.QLabel("")
-        self.rec_timer_lbl.setStyleSheet("color: #EF4444; font-size: 11px; font-weight: 700; margin-left: 2px;")
-        self.rec_timer_lbl.setVisible(False)
-        tb_layout.addWidget(self.rec_timer_lbl)
-
-        # Quick Note Button
-        self.note_btn = QtWidgets.QPushButton("📝 Note")
-        self.note_btn.setToolTip("Quickly log a test observation (Ctrl+Shift+O)")
-        self.note_btn.setStyleSheet("padding: 3px 8px; font-size: 11px;")
-        self.note_btn.setShortcut(QtGui.QKeySequence("Ctrl+Shift+O"))
-        self.note_btn.clicked.connect(self.quick_note_requested)
-        tb_layout.addWidget(self.note_btn)
-
-        tb_layout.addStretch()
-
-        # Display Viewing Mode Dropdown (FIT, FILL, ORIGINAL)
-        m_lbl = QtWidgets.QLabel("Mode:")
-        m_lbl.setStyleSheet("color: #8DA2BC; font-size: 10px;")
-        tb_layout.addWidget(m_lbl)
+        mode_label = QtWidgets.QLabel("Scaling")
+        mode_label.setObjectName("inlineLabel")
+        bar.addWidget(mode_label)
 
         self.mode_combo = QtWidgets.QComboBox()
-        self.mode_combo.addItems(["FIT (Contain)", "FILL (Crop)", "ORIGINAL (1:1)"])
-        self.mode_combo.setStyleSheet("font-size: 10px; padding: 2px 4px;")
+        self.mode_combo.addItems(["Fit", "Fill", "Original"])
+        self.mode_combo.setToolTip("Fit keeps the whole screen visible, Fill crops, Original is 1:1")
         self.mode_combo.currentTextChanged.connect(self._on_mode_changed)
-        tb_layout.addWidget(self.mode_combo)
+        bar.addWidget(self.mode_combo)
 
-        # Quality Profile Dropdown
-        q_lbl = QtWidgets.QLabel("Quality:")
-        q_lbl.setStyleSheet("color: #8DA2BC; font-size: 10px;")
-        tb_layout.addWidget(q_lbl)
+        quality_label = QtWidgets.QLabel("Quality")
+        quality_label.setObjectName("inlineLabel")
+        bar.addWidget(quality_label)
 
         self.quality_combo = QtWidgets.QComboBox()
-        self.quality_combo.addItems(["Balanced (1080p)", "Performance (720p)", "High (Native)"])
-        self.quality_combo.setStyleSheet("font-size: 10px; padding: 2px 4px;")
+        self.quality_combo.addItems(["Balanced", "Performance", "Native"])
         self.quality_combo.currentTextChanged.connect(self._on_quality_changed)
-        tb_layout.addWidget(self.quality_combo)
+        bar.addWidget(self.quality_combo)
 
-        # Fullscreen Toggle Button
-        self.fs_btn = QtWidgets.QPushButton("⛶")
-        self.fs_btn.setToolTip("Toggle Fullscreen Mirror")
-        self.fs_btn.setStyleSheet("padding: 3px 6px; font-size: 11px;")
-        self.fs_btn.clicked.connect(self._toggle_fullscreen)
-        tb_layout.addWidget(self.fs_btn)
+        bar.addStretch(1)
 
-        self.main_layout.addWidget(self.toolbar)
+        self.fullscreen_btn = QtWidgets.QPushButton("Fullscreen")
+        self.fullscreen_btn.setObjectName("ghostBtn")
+        self.fullscreen_btn.clicked.connect(self._toggle_fullscreen)
+        bar.addWidget(self.fullscreen_btn)
 
-        # 2. Responsive Viewport Canvas (Center)
+        root.addWidget(toolbar)
+
         self.canvas = ViewportCanvas(self)
-        self.main_layout.addWidget(self.canvas, stretch=1)
+        root.addWidget(self.canvas, stretch=1)
 
-        # 3. Synchronization HUD (Bottom)
-        self.hud = SyncHUD(self)
-        self.hud.resync_requested.connect(self.resync_requested)
-        self.hud.reset_resolution_requested.connect(self.reset_resolution_requested)
-        self.main_layout.addWidget(self.hud)
+        self.sync_bar = SyncBar(self)
+        self.sync_bar.resync_requested.connect(self.resync_requested)
+        self.sync_bar.reset_resolution_requested.connect(self.reset_resolution_requested)
+        root.addWidget(self.sync_bar)
 
     def _connect_signals(self) -> None:
         self.scrcpy_mgr.started.connect(self._on_scrcpy_started)
         self.scrcpy_mgr.stopped.connect(self._on_scrcpy_stopped)
-        self.scrcpy_mgr.stream_dimensions_changed.connect(self._on_stream_dimensions_changed)
-        self.scrcpy_mgr.stream_fps_reported.connect(self._on_stream_fps_reported)
-        self.canvas.geometry_updated.connect(self._on_preview_geometry_updated)
+        self.scrcpy_mgr.stream_dimensions_changed.connect(self._on_stream_dimensions)
+        self.canvas.geometry_updated.connect(self._on_view_geometry)
 
+    # -------------------------------------------------------------- state
     def set_android_dimensions(self, width: int, height: int) -> None:
-        """Update Android logical resolution value in HUD and canvas."""
         self._android_w = width
         self._android_h = height
-        self.hud.android_lbl.setText(f"📱 Android: {width}×{height}")
+        self.sync_bar.device_lbl.setText(f"Device {width}\u00d7{height}")
+        self.sync_bar.device_lbl.setToolTip(
+            f"Logical resolution Android is rendering ({ratio_text(width, height)})"
+        )
         if self._stream_w == 0:
             self.canvas.set_target_dimensions(width, height)
-        self._update_sync_status()
+        self._update_sync_state()
 
-    def preview_profile_dimensions(self, width: int, height: int, profile_name: str) -> None:
-        """Preview a profile's aspect ratio inside the canvas without changing device resolution."""
-        logger.info("Previewing profile in ViewportCanvas: %s (%dx%d)", profile_name, width, height)
-        self.canvas.set_target_dimensions(width, height)
-        self.hud.sync_badge.setText(f"● Preview: {profile_name}")
-        self.hud.sync_badge.setStyleSheet("font-weight: 600; color: #38BDF8;")
-        self.canvas.show_updating_overlay(False)
+    def set_updating_state(self, active: bool, message: str = "") -> None:
+        self.canvas.show_updating_overlay(active, message)
+        if not active:
+            self._update_sync_state()
 
-    def set_updating_state(self, is_updating: bool, message: str = "⟳ Updating display...") -> None:
-        """Show or hide the updating display overlay badge."""
-        self.canvas.show_updating_overlay(is_updating, message)
+    def set_quality(self, profile: str) -> None:
+        labels = {"performance": "Performance", "high": "Native", "balanced": "Balanced"}
+        self.quality_combo.blockSignals(True)
+        self.quality_combo.setCurrentText(labels.get(profile, "Balanced"))
+        self.quality_combo.blockSignals(False)
 
-    def _on_stream_dimensions_changed(self, width: int, height: int) -> None:
-        """Update stream texture resolution value in HUD and canvas."""
-        logger.info("Live stream dimensions received: %dx%d", width, height)
+    def reset_view(self) -> None:
+        self._on_scrcpy_stopped(0)
+        self._android_w = self._android_h = 0
+        self.sync_bar.device_lbl.setText("Device --")
+        self.sync_bar.view_lbl.setText("View --")
+        self.canvas.status_title.setText("No device mirror")
+        self.canvas.status_desc.setText("Connect an Android device with USB debugging enabled.")
+
+    # ------------------------------------------------------------- stream
+    def _on_stream_dimensions(self, width: int, height: int) -> None:
         self._stream_w = width
         self._stream_h = height
         self.canvas.show_updating_overlay(False)
-        self.hud.stream_lbl.setText(f"📺 Stream: {width}×{height}")
+        self.sync_bar.stream_lbl.setText(f"Stream {width}\u00d7{height}")
         self.canvas.set_target_dimensions(width, height)
-        self._update_sync_status()
+        self._update_sync_state()
+        # scrcpy reveals its window on the first decoded frame. Reparenting it any
+        # earlier (while it is still hidden and the renderer is being set up) makes
+        # scrcpy die with SIGFPE, so embedding waits for this moment.
+        self._start_embed_poll()
 
-    def _on_stream_fps_reported(self, fps: float) -> None:
-        self.hud.fps_lbl.setText(f"⚡ {fps:.1f} fps")
+    def _on_view_geometry(self, width: int, height: int, scale: float) -> None:
+        if width <= 0:
+            self.sync_bar.view_lbl.setText("View --")
+            return
+        self.sync_bar.view_lbl.setText(f"View {width}\u00d7{height}  ({scale * 100:.0f}%)")
 
-    def _on_preview_geometry_updated(self, width: int, height: int, ratio_str: str) -> None:
-        self._preview_w = width
-        self._preview_h = height
-        self._preview_ratio = ratio_str
-        self.hud.preview_lbl.setText(f"🖥 Preview: {width}×{height} ({ratio_str})")
-
-    def _update_sync_status(self) -> None:
-        """Step 7: Compare Android logical and stream dimensions to show sync status."""
-        if self._android_w <= 0 or self._stream_w <= 0:
-            self.hud.sync_badge.setText("● Active")
-            self.hud.sync_badge.setStyleSheet("font-weight: 600; color: #94A3B8;")
+    def _update_sync_state(self) -> None:
+        """Sync means the stream keeps the device aspect ratio (scaled by max-size)."""
+        if not self._stream_w or not self._stream_h:
+            self.sync_bar.sync_lbl.setText("\u25cf Idle")
+            self.sync_bar.sync_lbl.setObjectName("syncIdle")
+            self.sync_bar.sync_lbl.setToolTip("No video stream is running")
+            self._restyle_sync()
             return
 
-        is_direct_match = (self._android_w == self._stream_w and self._android_h == self._stream_h)
-        is_rotated_match = (self._android_w == self._stream_h and self._android_h == self._stream_w)
+        if not self._android_w or not self._android_h:
+            self.sync_bar.sync_lbl.setText("\u25cf Streaming")
+            self.sync_bar.sync_lbl.setObjectName("syncIdle")
+            self._restyle_sync()
+            return
 
-        if is_direct_match or is_rotated_match:
-            self.hud.sync_badge.setText("● Synchronized")
-            self.hud.sync_badge.setStyleSheet("font-weight: 600; color: #10B981;")
-            self.hud.sync_badge.setToolTip("Android logical display and scrcpy stream dimensions are perfectly synchronized.")
+        device_ratio = self._android_w / self._android_h
+        stream_ratio = self._stream_w / self._stream_h
+        device_shape = self._android_w >= self._android_h
+        stream_shape = self._stream_w >= self._stream_h
+        drift = abs(device_ratio - stream_ratio) / device_ratio
+
+        if device_shape == stream_shape and drift <= 0.01:
+            self.sync_bar.sync_lbl.setText("\u2713 Synced")
+            self.sync_bar.sync_lbl.setObjectName("syncOk")
+            self.sync_bar.sync_lbl.setToolTip("Stream and device resolutions have the same aspect ratio.")
         else:
-            self.hud.sync_badge.setText("⚠️ Mismatch")
-            self.hud.sync_badge.setStyleSheet("font-weight: 600; color: #F59E0B;")
-            self.hud.sync_badge.setToolTip(
-                f"Dimension mismatch:\nAndroid: {self._android_w}x{self._android_h}\n"
-                f"Stream:  {self._stream_w}x{self._stream_h}\nClick Re-Sync to align."
+            self.sync_bar.sync_lbl.setText("\u26a0 Desync")
+            self.sync_bar.sync_lbl.setObjectName("syncBad")
+            self.sync_bar.sync_lbl.setToolTip(
+                f"Device {self._android_w}x{self._android_h} vs stream "
+                f"{self._stream_w}x{self._stream_h}. Press Re-sync."
             )
+        self._restyle_sync()
 
-    def _on_mode_changed(self, text: str) -> None:
-        if "FILL" in text:
-            self._active_mode_str = "fill"
-            self.canvas.set_display_mode("fill")
-            self.hud.mode_badge.setText("[FILL — ✂ Crop Active]")
-            self.hud.mode_badge.setStyleSheet("color: #F59E0B; font-weight: 600; font-size: 10px;")
-        elif "ORIGINAL" in text:
-            self._active_mode_str = "original"
-            self.canvas.set_display_mode("original")
-            self.hud.mode_badge.setText("[ORIGINAL (1:1)]")
-            self.hud.mode_badge.setStyleSheet("color: #A78BFA; font-weight: 600; font-size: 10px;")
-        else:
-            self._active_mode_str = "fit"
-            self.canvas.set_display_mode("fit")
-            self.hud.mode_badge.setText("[FIT]")
-            self.hud.mode_badge.setStyleSheet("color: #38BDF8; font-weight: 600; font-size: 10px;")
+    def _restyle_sync(self) -> None:
+        self.sync_bar.sync_lbl.style().unpolish(self.sync_bar.sync_lbl)
+        self.sync_bar.sync_lbl.style().polish(self.sync_bar.sync_lbl)
 
-    def _on_quality_changed(self, text: str) -> None:
-        if "Performance" in text:
-            self.quality_changed.emit("performance")
-        elif "High" in text:
-            self.quality_changed.emit("high")
-        else:
-            self.quality_changed.emit("balanced")
-
-    def _toggle_fullscreen(self) -> None:
-        self._is_fullscreen = not self._is_fullscreen
-        self.fullscreen_toggled.emit(self._is_fullscreen)
-
-    def set_recording_state(self, is_recording: bool, elapsed_seconds: int = 0) -> None:
-        if is_recording:
-            self.rec_btn.setText("⏹ Stop Rec")
-            self.rec_btn.setStyleSheet(
-                "padding: 3px 8px; font-size: 11px; font-weight: 600; background-color: #EF4444; color: white; border-radius: 3px;"
-            )
-            m = elapsed_seconds // 60
-            s = elapsed_seconds % 60
-            self.rec_timer_lbl.setText(f"● {m:02d}:{s:02d}")
-            self.rec_timer_lbl.setVisible(True)
-        else:
-            self.rec_btn.setText("⏺ Rec")
-            self.rec_btn.setStyleSheet("padding: 3px 8px; font-size: 11px; font-weight: 600; color: #EF4444;")
-            self.rec_timer_lbl.setVisible(False)
-
+    # ------------------------------------------------------------- scrcpy
     def _on_scrcpy_started(self, window_title: str) -> None:
-        """Handle scrcpy startup and begin native window polling."""
         self._pending_title = window_title
-        proc = self.scrcpy_mgr.current_proc
-        self._pending_pid = proc.pid if proc else None
+        process = self.scrcpy_mgr.current_proc
+        self._pending_pid = process.pid if process else None
         self._poll_attempts = 0
+        self._embed_abandoned = False
+        self._embed_deadline = time.monotonic() + EMBED_READY_TIMEOUT_S
 
-        self.canvas.status_title.setText("Embedding Live Android Screen...")
-        self.canvas.status_desc.setText(f"Synchronizing session: {window_title}")
+        self.canvas.status_title.setText("Starting mirror...")
+        self.canvas.status_desc.setText("Waiting for the scrcpy window.")
         self.canvas.wayland_banner.setVisible(False)
 
-        if not self._embedder:
+        if self._embedder is None:
             self._embedder = get_window_embedder()
 
-        if self._embedder:
-            self._poll_timer.start()
-        else:
-            diag = WaylandHelper.get_diagnostics()
+        # Fallback only starts *looking* for the window if the first-frame report never
+        # arrives. It cannot weaken the safety gate: _check_and_embed still refuses to
+        # reparent a window the display server has not mapped yet.
+        QtCore.QTimer.singleShot(3000, self._start_embed_poll)
+
+        if self._embedder is None:
+            diagnostics = WaylandHelper.get_diagnostics()
+            self.canvas.wayland_banner.setText(diagnostics.guidance_message)
             self.canvas.wayland_banner.setVisible(True)
-            self.canvas.wb_text.setText(diag.guidance_message)
-            self.canvas.status_title.setText("scrcpy Running (Companion Mode)")
-            self.canvas.status_desc.setText("Display server restricted cross-process window reparenting.")
+            self.canvas.status_title.setText("scrcpy running in its own window")
+            self.canvas.status_desc.setText(
+                "This session cannot reparent native windows. Start SUSCRCPY with "
+                "QT_QPA_PLATFORM=xcb to embed the screen here."
+            )
+
+    def _start_embed_poll(self) -> None:
+        """Begin looking for the scrcpy window once it is actually shown."""
+        if self._embedder is None or not self._pending_title or self._embed_abandoned:
+            return
+        if self._window_id or self._poll_timer.isActive():
+            return
+        if self._embed_deadline <= 0:
+            self._embed_deadline = time.monotonic() + EMBED_READY_TIMEOUT_S
+        self._poll_attempts = 0
+        self._poll_timer.start()
 
     def _check_and_embed(self) -> None:
-        """Poll for foreign scrcpy window and embed once ready."""
+        """Embed only a window the display server reports as mapped.
+
+        There is deliberately no attempt-count bypass here: reparenting scrcpy's still
+        hidden pre-first-frame window is what produces the SIGFPE (exit code -8), so the
+        window is either proven visible or it stays in its own window.
+        """
         self._poll_attempts += 1
         if not self._pending_title or not self._embedder:
             self._poll_timer.stop()
             return
 
-        wid = self._embedder.find_window(self._pending_title, self._pending_pid, timeout=0.1)
-        if wid:
-            self._poll_timer.stop()
-            logger.info("Found native window 0x%x; embedding into canvas...", wid)
-            self._window_id = wid
-            self._embed_native_window(wid)
+        window_id = self._embedder.find_window(self._pending_title, self._pending_pid, timeout=0.1)
+        if not window_id:
+            if time.monotonic() >= self._embed_deadline:
+                self._abandon_embedding("The scrcpy window never appeared.")
             return
 
-        if self._poll_attempts > 60:  # ~5 seconds
-            self._poll_timer.stop()
-            logger.warning("Scrcpy window embedding timed out; keeping external window.")
-            self.canvas.status_title.setText("scrcpy Screen Active (External Window)")
-            self.canvas.status_desc.setText("The mirroring session is active in its native window.")
+        if not self._embedder.is_window_ready(window_id):
+            if time.monotonic() >= self._embed_deadline:
+                self._abandon_embedding("scrcpy never confirmed a visible first frame.")
+            return
+
+        self._poll_timer.stop()
+        self._window_id = window_id
+        self._embed_native_window(window_id)
+
+    def _abandon_embedding(self, reason: str) -> None:
+        """Give up safely: the mirror keeps running in its own top-level window."""
+        self._poll_timer.stop()
+        self._embed_abandoned = True
+        self._window_id = None
+        logger.warning("Embedding skipped: %s", reason)
+        self.canvas.status_title.setText("Mirror running in its own window")
+        self.canvas.status_desc.setText(
+            f"{reason} The device screen is still live \u2014 use Fullscreen if it is "
+            "hidden behind this window."
+        )
 
     def _embed_native_window(self, window_id: int) -> None:
-        """Reparent foreign window into canvas."""
         if not self._embedder:
             return
-
         container = self._embedder.embed_window(window_id, self.canvas)
-        if container:
+        if container is not None:
             self.canvas.attach_container(container)
-            logger.info("Native window 0x%x embedded successfully into ViewportCanvas.", window_id)
+            logger.info("Embedded scrcpy window 0x%x", window_id)
         else:
-            self.canvas.placeholder.setVisible(True)
-            self.canvas.status_title.setText("Window Embedding Unsupported")
-            self.canvas.status_desc.setText("Foreign window could not be reparented in this session.")
+            self.canvas.status_title.setText("Cannot embed window")
+            self.canvas.status_desc.setText(
+                "The display server refused to reparent the scrcpy window."
+            )
 
     def _on_scrcpy_stopped(self, exit_code: int) -> None:
-        """Clean up embedded container when scrcpy terminates."""
         self._poll_timer.stop()
         self.canvas.detach_container()
         self._window_id = None
         self._pending_title = None
         self._pending_pid = None
-        self._stream_w = 0
-        self._stream_h = 0
+        self._embed_deadline = 0.0
+        self._embed_abandoned = False
+        self._stream_w = self._stream_h = 0
         self.canvas.show_updating_overlay(False)
-        self.hud.stream_lbl.setText("📺 Stream: --")
-        self.hud.fps_lbl.setText("")
-        self._update_sync_status()
-
-        self.canvas.placeholder.setVisible(True)
-        self.canvas.status_title.setText("No Active Display Mirror")
-        self.canvas.status_desc.setText("Select a device or resolution ratio to restart screen mirroring.")
+        self.sync_bar.stream_lbl.setText("Stream --")
+        self._update_sync_state()
+        if exit_code not in (0, None):
+            self.canvas.status_title.setText("Mirror stopped")
+            self.canvas.status_desc.setText(
+                f"scrcpy exited with code {exit_code}. Press Re-sync to restart the mirror."
+            )
+        else:
+            self.canvas.status_title.setText("No device mirror")
+            self.canvas.status_desc.setText("Select a device or apply a ratio to start the mirror.")
         self.canvas.wayland_banner.setVisible(False)
 
-    def reset_view(self) -> None:
-        """Reset view to clean disconnected state."""
-        self._on_scrcpy_stopped(0)
-        self._android_w = 0
-        self._android_h = 0
-        self.hud.android_lbl.setText("📱 Android: --")
-        self.hud.preview_lbl.setText("🖥 Preview: --")
-        self.canvas.status_title.setText("No Active Display Mirror")
-        self.canvas.status_desc.setText("Connect an Android device with USB Debugging enabled.")
+    # ------------------------------------------------------------- actions
+    def _on_mode_changed(self, text: str) -> None:
+        mode = {"Fill": "fill", "Original": "original"}.get(text, "fit")
+        self.canvas.set_display_mode(mode)
+        self.sync_bar.mode_lbl.setText(mode.upper())
+        self.mode_changed.emit(mode)
+
+    def _on_quality_changed(self, text: str) -> None:
+        quality = {"Performance": "performance", "Native": "high"}.get(text, "balanced")
+        self.quality_changed.emit(quality)
+
+    def _toggle_fullscreen(self) -> None:
+        self._is_fullscreen = not self._is_fullscreen
+        self.fullscreen_toggled.emit(self._is_fullscreen)

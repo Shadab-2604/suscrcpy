@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 
 
 class LogSeverity(str, Enum):
@@ -25,7 +25,7 @@ class LogSeverity(str, Enum):
 CONFIRMED_CRASH_PATTERNS = [
     re.compile(r"FATAL EXCEPTION:\s*", re.IGNORECASE),
     re.compile(r"AndroidRuntime:\s+FATAL EXCEPTION", re.IGNORECASE),
-    re.compile(r"Process\s+[a-zA-Z0-9._:]+\s+\(pid\s+\d+\)\s+has died", re.IGNORECASE),
+    re.compile(r"Process\s+[a-zA-Z0-9._:]+\.*[a-zA-Z0-9._:]*\s+\(pid\s+\d+\)\s+has died", re.IGNORECASE),
     re.compile(r"ANR in\s+[a-zA-Z0-9._]+", re.IGNORECASE),
     re.compile(r"Application Not Responding:\s*", re.IGNORECASE),
     re.compile(r"Fatal signal\s+\d+\s+\(SIG[A-Z]+\)", re.IGNORECASE),
@@ -44,6 +44,7 @@ class DetectionResult:
     is_warning: bool
     is_stack_trace: bool
     crash_reason: Optional[str] = None
+    is_crash_event: bool = False
 
 
 class ErrorDetector:
@@ -52,6 +53,14 @@ class ErrorDetector:
     Follows strict Android log priorities (V, D, I, W, E, F) as the primary classification.
     Informational (I) or Debug (D) messages are never classified as errors merely because
     they contain words like 'error', 'failed', 'invalid', 'cache', or 'exception'.
+
+    Counter semantics (documented so the UI numbers are exact):
+
+    * ``error_count`` counts every line whose severity is ERROR/FATAL, including the
+      header and the stack-trace lines of a crash.
+    * ``warning_count`` counts W lines only.
+    * ``crash_count`` counts crash *events* (one header match), not every stack line,
+      so a single crash with twelve ``at ...`` frames is one crash.
     """
 
     def __init__(self) -> None:
@@ -88,6 +97,7 @@ class ErrorDetector:
         combined_text = f"{tag}: {message}"
         is_stack = bool(STACK_TRACE_PATTERN.search(message))
         is_crash = False
+        is_crash_event = False
         crash_reason = None
 
         # Check for confirmed crash signatures (only at level E, F, or unhandled crash headers)
@@ -95,6 +105,7 @@ class ErrorDetector:
             for pattern in CONFIRMED_CRASH_PATTERNS:
                 if pattern.search(combined_text):
                     is_crash = True
+                    is_crash_event = True
                     crash_reason = pattern.pattern
                     self._in_crash_state = True
                     self._last_crash_pid = pid
@@ -116,12 +127,12 @@ class ErrorDetector:
         is_error = (severity in (LogSeverity.ERROR, LogSeverity.FATAL)) or is_crash
         is_warning = (severity == LogSeverity.WARNING) and not is_error
 
-        if is_crash:
-            self.crash_count += 1
-        elif is_error:
+        if is_error:
             self.error_count += 1
-        elif is_warning:
+        if is_warning:
             self.warning_count += 1
+        if is_crash_event:
+            self.crash_count += 1
 
         return DetectionResult(
             severity=severity,
@@ -130,4 +141,5 @@ class ErrorDetector:
             is_warning=is_warning,
             is_stack_trace=is_stack,
             crash_reason=crash_reason,
+            is_crash_event=is_crash_event,
         )

@@ -1,13 +1,9 @@
-"""Slim horizontal header bar for SUSCRCPY.
-
-Contains application brand identity, connected device dropdown,
-live connection status indicator, and refresh action.
-"""
+"""Slim top bar: brand, device selector, connection state, refresh."""
 from __future__ import annotations
 
 from typing import List, Optional
 
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtWidgets
 
 from core.adb_manager import DeviceItem
 from core.device_manager import ConnectionState, DeviceManager
@@ -16,148 +12,91 @@ from version import APP_NAME, APP_VERSION
 
 
 class HeaderBar(QtWidgets.QFrame):
-    """Header bar positioned across the top of the main window."""
+    """Connection header for the single-window workstation."""
 
-    device_selected = QtCore.Signal(str)  # serial
+    device_selected = QtCore.Signal(str)
     refresh_requested = QtCore.Signal()
-    check_updates_requested = QtCore.Signal()
-    reset_layout_requested = QtCore.Signal()
-    session_action_requested = QtCore.Signal()
 
     def __init__(self, device_manager: DeviceManager, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
         self.setObjectName("headerBar")
         self.device_mgr = device_manager
-        self._block_signals = False
+        self._block = False
         self._build_ui()
-        self._connect_signals()
+        self.device_mgr.devices_updated.connect(self.update_devices)
+        self.device_mgr.status_changed.connect(self.update_status)
 
     def _build_ui(self) -> None:
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(14, 0, 14, 0)
         layout.setSpacing(12)
 
-        # Left: Brand Identity
-        brand_layout = QtWidgets.QHBoxLayout()
-        brand_layout.setSpacing(6)
-        self.brand_title = QtWidgets.QLabel(APP_NAME)
-        self.brand_title.setObjectName("brandTitle")
-        brand_layout.addWidget(self.brand_title)
+        title = QtWidgets.QLabel(APP_NAME)
+        title.setObjectName("brandTitle")
+        layout.addWidget(title)
 
-        version_label = QtWidgets.QLabel(f"v{APP_VERSION}")
-        version_label.setStyleSheet("color: #666666; font-size: 11px;")
-        brand_layout.addWidget(version_label)
-        layout.addLayout(brand_layout)
+        version = QtWidgets.QLabel(f"v{APP_VERSION}")
+        version.setObjectName("brandVersion")
+        layout.addWidget(version)
 
         layout.addStretch(1)
 
-        # Center: Connected Device Dropdown
-        center_layout = QtWidgets.QHBoxLayout()
-        center_layout.setSpacing(6)
-        center_layout.addWidget(QtWidgets.QLabel("Device:"))
-
+        layout.addWidget(QtWidgets.QLabel("Device"))
         self.device_combo = QtWidgets.QComboBox()
-        self.device_combo.setMinimumWidth(260)
-        self.device_combo.setMaximumWidth(360)
+        self.device_combo.setMinimumWidth(300)
         self.device_combo.currentIndexChanged.connect(self._on_combo_changed)
-        center_layout.addWidget(self.device_combo)
-        layout.addLayout(center_layout)
+        layout.addWidget(self.device_combo)
+
+        self.status_lbl = QtWidgets.QLabel("\u25cf Disconnected")
+        self.status_lbl.setObjectName("statusDot")
+        self.status_lbl.setStyleSheet(f"color: {COLOR_ERROR};")
+        layout.addWidget(self.status_lbl)
 
         layout.addStretch(1)
 
-        # Right: Connection Status & Refresh Action & Updates
-        right_layout = QtWidgets.QHBoxLayout()
-        right_layout.setSpacing(8)
-
-        self.status_dot = QtWidgets.QLabel("● Disconnected")
-        self.status_dot.setObjectName("statusDot")
-        self.status_dot.setStyleSheet(f"color: {COLOR_ERROR};")
-        right_layout.addWidget(self.status_dot)
-
-        self.session_chip = QtWidgets.QPushButton("📋 No Active Session")
-        self.session_chip.setStyleSheet("background: #18202C; border: 1px solid #263345; color: #8DA2BC; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;")
-        self.session_chip.setToolTip("Click to view or start a Testing Session")
-        self.session_chip.clicked.connect(self.session_action_requested)
-        right_layout.addWidget(self.session_chip)
-
-        self.refresh_btn = QtWidgets.QPushButton("↻ Refresh")
+        self.refresh_btn = QtWidgets.QPushButton("Refresh devices")
+        self.refresh_btn.setObjectName("ghostBtn")
         self.refresh_btn.setToolTip("Scan for connected ADB devices")
         self.refresh_btn.clicked.connect(self.refresh_requested)
-        right_layout.addWidget(self.refresh_btn)
+        layout.addWidget(self.refresh_btn)
 
-        self.layout_btn = QtWidgets.QPushButton("⊞ Reset Layout")
-        self.layout_btn.setToolTip("Reset screen and settings splitters to 50/50 division")
-        self.layout_btn.clicked.connect(self.reset_layout_requested)
-        right_layout.addWidget(self.layout_btn)
-
-        self.updates_btn = QtWidgets.QPushButton("🔄 Updates")
-        self.updates_btn.setToolTip("Check for software updates on GitHub")
-        self.updates_btn.clicked.connect(self.check_updates_requested)
-        right_layout.addWidget(self.updates_btn)
-
-        layout.addLayout(right_layout)
-
-    def _connect_signals(self) -> None:
-        self.device_mgr.devices_updated.connect(self.update_devices_list)
-        self.device_mgr.status_changed.connect(self.update_status)
-
-    def update_devices_list(self, devices: List[DeviceItem]) -> None:
-        """Populate the target device combobox."""
-        self._block_signals = True
-        current_serial = self.device_mgr.selected_serial
+    # ---------------------------------------------------------------- data
+    def update_devices(self, devices: List[DeviceItem]) -> None:
+        self._block = True
         self.device_combo.clear()
+        selected = self.device_mgr.selected_serial
 
         if not devices:
             self.device_combo.addItem("No Android devices connected", "")
             self.device_combo.setEnabled(False)
-            self._block_signals = False
+            self._block = False
             self.update_status("", ConnectionState.DISCONNECTED.value)
             return
 
         self.device_combo.setEnabled(True)
-        selected_idx = 0
-        for idx, dev in enumerate(devices):
-            status_tag = "" if dev.is_authorized else f" [{dev.status}]"
-            label = f"{dev.model} ({dev.serial}){status_tag}"
-            self.device_combo.addItem(label, dev.serial)
-            if dev.serial == current_serial:
-                selected_idx = idx
-
-        self.device_combo.setCurrentIndex(selected_idx)
-        self._block_signals = False
+        index = 0
+        for position, device in enumerate(devices):
+            suffix = "" if device.is_authorized else f"  [{device.status}]"
+            self.device_combo.addItem(f"{device.model}  ({device.serial}){suffix}", device.serial)
+            if device.serial == selected:
+                index = position
+        self.device_combo.setCurrentIndex(index)
+        self._block = False
 
     def _on_combo_changed(self, index: int) -> None:
-        if self._block_signals or index < 0:
+        if self._block or index < 0:
             return
         serial = self.device_combo.itemData(index)
         if serial:
             self.device_selected.emit(serial)
 
-    def update_status(self, serial: str, state_str: str) -> None:
-        """Update live status indicator."""
-        if state_str == ConnectionState.CONNECTED.value:
-            color = COLOR_SUCCESS
-            text = f"● Connected"
-        elif state_str in (ConnectionState.UNAUTHORIZED.value, ConnectionState.RECONNECTING.value):
-            color = COLOR_WARNING
-            text = f"● {state_str}"
+    def update_status(self, serial: str, state: str) -> None:
+        if state == ConnectionState.CONNECTED.value:
+            color, text = COLOR_SUCCESS, "\u25cf Connected"
+        elif state in (ConnectionState.UNAUTHORIZED.value, ConnectionState.RECONNECTING.value,
+                       ConnectionState.CONNECTING.value):
+            color, text = COLOR_WARNING, f"\u25cf {state}"
         else:
-            color = COLOR_ERROR
-            text = f"● {state_str}"
-        self.status_dot.setText(text)
-        self.status_dot.setStyleSheet(f"color: {color};")
-
-    def update_session_badge(self, session_id: Optional[str], status: str) -> None:
-        """Update session badge in header."""
-        if not session_id or status in ("Completed", "Interrupted"):
-            self.session_chip.setText("📋 No Active Session")
-            self.session_chip.setStyleSheet("background: #18202C; border: 1px solid #263345; color: #8DA2BC; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;")
-        elif status == "Running":
-            self.session_chip.setText(f"● {session_id} [RUNNING]")
-            self.session_chip.setStyleSheet("background: rgba(16, 185, 129, 0.2); border: 1px solid #10B981; color: #34D399; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;")
-        elif status == "Paused":
-            self.session_chip.setText(f"⏸ {session_id} [PAUSED]")
-            self.session_chip.setStyleSheet("background: rgba(245, 158, 11, 0.2); border: 1px solid #F59E0B; color: #FBBF24; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;")
-
-        self.status_dot.setText(text)
-        self.status_dot.setStyleSheet(f"color: {color}; font-weight: 600;")
+            color, text = COLOR_ERROR, f"\u25cf {state}"
+        self.status_lbl.setText(text)
+        self.status_lbl.setStyleSheet(f"color: {color};")

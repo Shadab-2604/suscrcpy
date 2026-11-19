@@ -15,13 +15,21 @@ from typing import Optional
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
-from platform.base import BaseWindowEmbedder
+from display_backend.base import BaseWindowEmbedder
 
 logger = logging.getLogger("suscrcpy.platform.linux_x11")
 
 
 class LinuxX11Embedder(BaseWindowEmbedder):
     """Embeds external X11 windows into Qt container widgets."""
+
+    # Without xwininfo there is no map-state query, so wait out a short grace period
+    # during which scrcpy is still creating its hidden window before assuming it is safe.
+    NO_TOOL_GRACE_S = 2.0
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._first_seen: dict[int, float] = {}
 
     def is_supported(self) -> bool:
         """Supported when DISPLAY environment variable is set (X11 or XWayland)."""
@@ -84,6 +92,29 @@ class LinuxX11Embedder(BaseWindowEmbedder):
 
         logger.warning("Timed out searching for X11 window with title '%s'", window_title)
         return None
+
+    def is_window_ready(self, window_id: int) -> bool:
+        """True once the window is mapped, i.e. scrcpy has shown its first frame."""
+        now = time.monotonic()
+        first_seen = self._first_seen.setdefault(window_id, now)
+
+        if not shutil.which("xwininfo"):
+            return now - first_seen >= self.NO_TOOL_GRACE_S
+        try:
+            res = subprocess.run(
+                ["xwininfo", "-id", str(window_id)],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=1.5,
+                check=False,
+            )
+            if res.returncode != 0:
+                return False
+            return "IsViewable" in res.stdout
+        except Exception as e:  # noqa: BLE001 - fall back to embedding
+            logger.debug("xwininfo readiness check failed: %s", e)
+            return True
 
     def embed_window(
         self,

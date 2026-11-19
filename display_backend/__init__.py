@@ -5,10 +5,10 @@ import os
 import sys
 from typing import Optional
 
-from platform.base import BaseWindowEmbedder
-from platform.linux_wayland import WaylandHelper
-from platform.linux_x11 import LinuxX11Embedder
-from platform.windows import WindowsEmbedder
+from display_backend.base import BaseWindowEmbedder
+from display_backend.linux_wayland import WaylandHelper
+from display_backend.linux_x11 import LinuxX11Embedder
+from display_backend.windows import WindowsEmbedder
 
 
 def get_window_embedder() -> Optional[BaseWindowEmbedder]:

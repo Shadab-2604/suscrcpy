@@ -53,6 +53,7 @@ class ScrcpyManager(QObject):
         self._stream_width: int = 0
         self._stream_height: int = 0
         self._reader_thread: Optional[Any] = None
+        self._stop_requested = False
 
     @property
     def stream_dimensions(self) -> Tuple[int, int]:
@@ -158,6 +159,8 @@ class ScrcpyManager(QObject):
             "--window-title",
             window_title,
             "--stay-awake",
+            "--no-audio",
+            "--print-fps",
         ]
 
         # Apply streaming quality profiles
@@ -198,6 +201,7 @@ class ScrcpyManager(QObject):
                 start_new_session=(not sys.platform.startswith("win")),
             )
             self._current_proc = proc
+            self._stop_requested = False
             ProcessManager.instance().register(proc)
 
             # Spawn reader thread to capture stream dimensions and texture changes
@@ -205,12 +209,32 @@ class ScrcpyManager(QObject):
             self._reader_thread = reader
             reader.start()
 
+            # Detect an unexpected exit (crash, device unplug) so the UI never shows a
+            # frozen mirror.
+            threading.Thread(target=self._watch_exit, args=(proc,), daemon=True).start()
+
             self.started.emit(window_title)
             return proc, window_title
         except FileNotFoundError as e:
             raise ScrcpyError(f"scrcpy executable not found at '{self._scrcpy_path}'.") from e
         except Exception as e:
             raise ScrcpyError(f"Failed to start scrcpy: {e}") from e
+
+    def _watch_exit(self, proc: subprocess.Popen) -> None:
+        """Report a self-inflicted process exit to the UI."""
+        try:
+            code = proc.wait()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Process watcher stopped: %s", exc)
+            return
+
+        if self._stop_requested or self._current_proc is not proc:
+            return
+
+        logger.warning("scrcpy exited unexpectedly with code %s", code)
+        self._current_proc = None
+        self._current_title = None
+        self.stopped.emit(code)
 
     def _read_stdout(self, proc: subprocess.Popen) -> None:
         """Read scrcpy stdout/stderr in real time to capture stream dimensions and fps."""
@@ -245,6 +269,7 @@ class ScrcpyManager(QObject):
     def stop(self, timeout: float = 3.0) -> None:
         """Safely stop the scrcpy process."""
         proc = self._current_proc
+        self._stop_requested = True
         self._current_proc = None
         self._current_title = None
 

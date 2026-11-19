@@ -6,13 +6,12 @@ crash detection, bounded GUI buffer, and streaming exports.
 from __future__ import annotations
 
 import logging
-import os
 import re
 import subprocess
 import time
-from collections import deque
 from dataclasses import dataclass
-from typing import Deque, List, Optional, Set
+from pathlib import Path
+from typing import Any, List, Optional, Set
 
 from PySide6.QtCore import QMutex, QObject, QThread, Signal
 
@@ -100,6 +99,11 @@ class LogStreamWorker(QThread):
             ProcessManager.instance().stop_process(self._proc, timeout=1.5)
             self._proc = None
         self.wait(2000)
+
+    def reset_counts(self) -> None:
+        """Zero the classification counters without interrupting capture."""
+        self._error_detector.reset_counts()
+        self.stats_updated.emit(0, 0, 0)
 
     def _update_target_pids(self) -> None:
         """Poll for currently running PIDs of the target application."""
@@ -324,13 +328,18 @@ class LogManager(QObject):
         mode_desc = f"Application '{target_package}'" if target_package else "Full Device"
         self.status_updated.emit(f"Logcat capture started [{mode_desc}]")
 
+    MAX_EXPORT_ENTRIES = 200_000
+
     def _handle_batch(self, batch: List[LogEntry]) -> None:
         self._full_export_buffer.extend(batch)
+        overflow = len(self._full_export_buffer) - self.MAX_EXPORT_ENTRIES
+        if overflow > 0:
+            del self._full_export_buffer[:overflow]
         if self._disk_file_handle:
             try:
                 for entry in batch:
                     self._disk_file_handle.write(entry.raw + "\n")
-                    if entry.level in ("ERROR", "CRASH"):
+                    if entry.detection.is_error:
                         if len(self._critical_errors_sample) < 150:
                             self._critical_errors_sample.append(f"[{entry.level}] {entry.tag}: {entry.message}")
             except Exception as e:
@@ -368,6 +377,14 @@ class LogManager(QObject):
         """Clear local in-memory view buffer without modifying device buffer."""
         # Note: Do not clear _full_export_buffer so users can still download complete logs
         self.status_updated.emit("Log display cleared")
+
+    def reset_statistics(self) -> None:
+        """Reset error/warning/crash counters while keeping captured log history."""
+        if self._worker is not None:
+            self._worker.reset_counts()
+        else:
+            self.stats_updated.emit(0, 0, 0)
+        self.status_updated.emit("Log counters reset")
 
     def clear_device_buffer(self, serial: str) -> None:
         """Clear the hardware log buffer on the Android device via adb logcat -c."""
