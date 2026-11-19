@@ -100,6 +100,34 @@ QTabWidget#workstationTabs QTabBar::tab:hover:!selected {{
     color: {COLOR_TEXT};
 }}
 
+/* ---------------------------------------------------------------- card */
+QFrame#cardPanel {{
+    background-color: {COLOR_ELEVATED};
+    border: 1px solid {COLOR_BORDER};
+    border-radius: 10px;
+}}
+
+QLabel#cardTitle {{
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.9px;
+    color: {COLOR_TEXT_MUTED};
+}}
+
+QLabel#installOk {{ color: {COLOR_SUCCESS}; font-weight: 600; }}
+QLabel#installError {{ color: {COLOR_ERROR}; font-weight: 600; }}
+
+QProgressBar {{
+    background-color: #101013;
+    border: none;
+    border-radius: 2px;
+}}
+
+QProgressBar::chunk {{
+    background-color: {COLOR_ACCENT};
+    border-radius: 2px;
+}}
+
 /* --------------------------------------------------------------- inputs */
 QLineEdit, QSpinBox, QComboBox {{
     background-color: {COLOR_ELEVATED};

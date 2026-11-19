@@ -7,11 +7,14 @@ real data instead of only affecting future lines.
 from __future__ import annotations
 
 import logging
+import os
+import time
 from typing import List, Optional, Tuple
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from core.device_manager import DeviceDetails
+from core.error_detector import ErrorDetector
 from core.log_exporter import LogExporter
 from core.log_manager import LogEntry, LogManager
 
@@ -294,6 +297,24 @@ class LogsPanel(QtWidgets.QWidget):
         if self._auto_scroll:
             self.log_text.ensureCursorVisible()
         self._update_line_count()
+
+    # --------------------------------------------------------------- notes
+    def note(self, message: str) -> None:
+        """Add a local workstation line (for example an APK install) to the log view."""
+        stamp = time.strftime("%m-%d %H:%M:%S.000")
+        pid = os.getpid()
+        detection = ErrorDetector().analyze("I", "SUSCRCPY", message, pid=pid)
+        entry = LogEntry(
+            timestamp=stamp,
+            pid=pid,
+            tid=pid,
+            level="I",
+            tag="SUSCRCPY",
+            message=message,
+            raw=f"{stamp} {pid:5d} {pid:5d} I SUSCRCPY: {message}",
+            detection=detection,
+        )
+        self.append_batch([entry])
 
     def _update_line_count(self) -> None:
         matching = sum(1 for entry in self._entries if self._entry_visible(entry))

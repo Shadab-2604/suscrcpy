@@ -14,6 +14,7 @@ from typing import Optional
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from core.adb_manager import AdbManager, DeviceDetails
+from core.apk_installer import ApkInstaller
 from core.app_manager import AppManager
 from core.device_manager import DeviceManager
 from core.log_manager import LogManager
@@ -73,6 +74,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.screen_mgr = ScreenManager(self.adb_mgr)
         self.scrcpy_mgr = ScrcpyManager(custom_scrcpy_path=custom_scrcpy)
         self.app_mgr = AppManager(self.adb_mgr)
+        self.apk_installer = ApkInstaller(self.adb_mgr, self)
         self.log_mgr = LogManager(self.adb_mgr)
         self.screenshot_mgr = ScreenshotManager(self.adb_mgr, self)
 
@@ -124,7 +126,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.display_panel = DisplayPanel(self.screen_mgr)
         self.tabs.addTab(self.display_panel, "Display")
 
-        self.apps_panel = AppsPanel(self.app_mgr)
+        self.apps_panel = AppsPanel(self.app_mgr, self.apk_installer)
         self.tabs.addTab(self.apps_panel, "Apps")
 
         self.logs_panel = LogsPanel(self.log_mgr)
@@ -156,6 +158,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.apps_panel.application_selected.connect(self._on_app_selected)
         self.apps_panel.refresh_requested.connect(self._on_refresh_apps)
+        self.apps_panel.apk_installed.connect(self._on_apk_installed)
 
         self.logs_panel.start_requested.connect(self._start_logs)
         self.logs_panel.stop_requested.connect(self._stop_logs)
@@ -170,6 +173,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._active_serial = None
             self.screen_view.reset_view()
             self.display_panel.clear_device()
+            self.apps_panel.set_device_serial(None)
             self.statusBar().showMessage("No device selected")
             return
 
@@ -183,6 +187,7 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         self.screen_view.set_android_dimensions(width, height)
         self.app_mgr.load_applications(details.serial)
+        self.apps_panel.set_device_serial(details.serial)
 
         self.statusBar().showMessage(
             f"{details.manufacturer} {details.model} \u2014 Android {details.android_version} "
@@ -206,6 +211,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._active_details = None
         self.screen_view.reset_view()
         self.display_panel.clear_device()
+        self.apps_panel.set_device_serial(None)
         self.logs_panel.set_streaming_active(False)
 
     # -------------------------------------------------------------- display
@@ -337,9 +343,18 @@ class MainWindow(QtWidgets.QMainWindow):
         if self._active_serial:
             self.app_mgr.load_applications(self._active_serial, force_refresh=True)
 
+    # ------------------------------------------------------------ install
+    def _on_apk_installed(self, apk_name: str) -> None:
+        """A fresh install changed the package list and is worth a log line."""
+        if self._active_serial:
+            self.app_mgr.load_applications(self._active_serial, force_refresh=True)
+        self.statusBar().showMessage(f"APK installed: {apk_name}", 8000)
+        self.logs_panel.note(f"APK installed from PC: {apk_name}")
+
     # ---------------------------------------------------------------- close
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self._stop_logs()
+        self.apk_installer.shutdown()
         self.scrcpy_mgr.stop()
         self.screen_mgr.restore_all()
         ProcessManager.instance().cleanup_all()

@@ -142,7 +142,7 @@ Or search for **SUSCRCPY** in your desktop application menu under *Development* 
 
 - **Left** — the live Android screen with a small toolbar (Screenshot, Scaling, Quality, Fullscreen) and a status strip showing device size, stream size, view size and sync state.
 - **Display** tab — aspect-ratio preset, width/height, Apply and Reset.
-- **Apps** tab — search and select the app to follow in the logs.
+- **Apps** tab — install an APK from this PC (browse or paste a path), then search and select the app to follow in the logs.
 - **Logs** tab — start/stop, pause, clear, reset counters, category filters and scoped export.
 
 ### CLI Reference
